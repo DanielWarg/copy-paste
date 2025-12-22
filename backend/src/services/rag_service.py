@@ -3,7 +3,7 @@ RAG service - retrieval augmented generation
 """
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text as sql_text
 from ..models.chunk import Chunk
 from ..models.source import Source
 from ..services.embeddings import get_embedding_provider
@@ -50,8 +50,8 @@ class RAGService:
             # Use pgvector similarity search
             # Note: This requires pgvector extension and proper index
             # For now, use simple text search until pgvector is properly set up
-            # TODO: Implement proper pgvector similarity search
-            query_sql = text("""
+            # TODO: Implement proper pgvector similarity search when pgvector extension is enabled
+            query_sql = sql_text("""
                 SELECT c.id, c.text, c.source_id, s.url
                 FROM chunks c
                 JOIN sources s ON c.source_id = s.id
