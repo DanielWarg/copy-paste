@@ -1,0 +1,2 @@
+"""Scout RSS Watcher Module"""
+

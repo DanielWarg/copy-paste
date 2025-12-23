@@ -79,6 +79,10 @@ class IngestRequest(BaseModel):
     """Request model for /api/v1/ingest"""
     input_type: Literal["url", "text", "pdf"]
     value: str = Field(..., description="URL, raw text, or PDF content")
+    metadata: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Optional metadata (e.g., scout_source, scout_feed_url, etc.)"
+    )
 
 
 class IngestResponse(BaseModel):
@@ -119,4 +123,28 @@ class DraftResponse(BaseModel):
     text: str
     citations: List[Citation]
     policy_violations: List[str]
+
+
+# MCP (Model Context Protocol) compatibility models
+
+class MCPIngestRequest(BaseModel):
+    """MCP-compatible ingestion request."""
+    tool: Literal["ingest"] = Field(..., description="Tool identifier (only 'ingest' supported in v1)")
+    input_type: Literal["url", "text", "pdf"] = Field(..., description="Type of input")
+    value: str = Field(..., description="URL, raw text, or PDF content")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Optional metadata (e.g., scout_source, scout_feed_url, etc.)"
+    )
+    correlation_id: Optional[str] = Field(
+        None,
+        description="Optional correlation ID for tracing"
+    )
+
+
+class MCPToolResponse(BaseModel):
+    """MCP-compatible tool response."""
+    ok: bool = Field(..., description="Success/failure indicator")
+    event_id: Optional[UUID] = Field(None, description="Event ID on success")
+    error: Optional[str] = Field(None, description="Error message on failure")
 

@@ -1,0 +1,33 @@
+.console-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  height: 100%;
+}
+
+.console-section {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.feeds-section {
+  flex: 0 0 auto;
+}
+
+.signal-section {
+  flex: 1 1 auto;
+  min-height: 300px;
+  overflow-y: auto;
+}
+
+.inspector-section {
+  flex: 0 0 auto;
+}
+
+.notifications-section {
+  flex: 0 0 auto;
+}
+

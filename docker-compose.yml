@@ -26,8 +26,32 @@ services:
       - "3000:3000"
     environment:
       - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_SCOUT_URL=http://localhost:8001
     volumes:
       - ./frontend:/app
       - /app/node_modules
     command: npm run dev -- --host 0.0.0.0
+
+  scout:
+    build:
+      context: ./scout
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - FEEDS_CONFIG=/app/feeds.yaml
+      - SCOUT_RUN_ONCE=${SCOUT_RUN_ONCE:-false}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-}
+      - SCOUT_ALLOW_CONFIG_WRITE=${SCOUT_ALLOW_CONFIG_WRITE:-false}
+      - SCOUT_ADMIN_TOKEN=${SCOUT_ADMIN_TOKEN:-}
+    volumes:
+      - ./scout:/app
+      - scout_data:/app/data
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  scout_data:
 

@@ -9,7 +9,8 @@ from app.core.rate_limit import RateLimitMiddleware
 from app.models import (
     IngestRequest, IngestResponse,
     ScrubRequest, ScrubResponse,
-    DraftRequest, DraftResponse
+    DraftRequest, DraftResponse,
+    MCPIngestRequest, MCPToolResponse
 )
 from app.modules.privacy.privacy_service import store_event, scrub_event
 from uuid import uuid4
@@ -54,7 +55,7 @@ async def ingest(request: IngestRequest):
     
     try:
         # Create standardized event
-        event = await create_event(request.input_type, request.value)
+        event = await create_event(request.input_type, request.value, request.metadata)
         
         # Store in memory (session-based, never persisted)
         store_event(event)
@@ -62,6 +63,21 @@ async def ingest(request: IngestRequest):
         return IngestResponse(event_id=event.event_id, status="created")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error ingesting data: {str(e)}")
+
+
+@app.post("/api/v1/mcp/ingest", response_model=MCPToolResponse)
+async def mcp_ingest_endpoint(request: MCPIngestRequest):
+    """
+    MCP-compatible ingestion endpoint.
+    
+    Tool-oriented interface that wraps the existing ingestion logic.
+    Returns MCP-style response with explicit ok/error structure.
+    
+    This endpoint uses the exact same internal functions as /api/v1/ingest,
+    ensuring no duplication and consistent behavior.
+    """
+    from app.modules.ingestion.mcp_adapter import mcp_ingest
+    return await mcp_ingest(request)
 
 
 @app.post("/api/v1/privacy/scrub", response_model=ScrubResponse)
