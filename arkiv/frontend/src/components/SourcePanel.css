@@ -1,0 +1,53 @@
+.source-panel {
+  margin-top: 20px;
+}
+
+.source-panel h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  color: #333;
+  font-weight: 600;
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.source-item {
+  padding: 15px;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.source-item:hover {
+  background: #e9ecef;
+}
+
+.source-item.selected {
+  background: #e3f2fd;
+  border-color: #2196f3;
+}
+
+.source-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.source-content {
+  color: #333;
+  line-height: 1.5;
+}
+
+.no-sources {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+}
+
