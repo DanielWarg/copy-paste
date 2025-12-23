@@ -11,25 +11,15 @@ env/
 *.egg-info/
 dist/
 build/
-.pytest_cache/
-.coverage
-htmlcov/
-*.log
-
-# Backend venv
-backend/.venv/
 
 # Node
 node_modules/
-.next/
-out/
-.nuxt/
-dist/
-.cache/
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
+dist/
+build/
 
 # IDEs
 .vscode/
@@ -37,26 +27,23 @@ yarn-error.log*
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Environment
 .env
 .env.local
-.env.prod
 .env.*.local
 
-# Docker
-*.pid
-*.seed
-*.pid.lock
+# Logs
+*.log
+logs/
 
-# Testing
+# Coverage
 coverage/
-.nyc_output/
-*.lcov
+*.coverage
+.coverage.*
+htmlcov/
 
-# Misc
-*.bak
-*.tmp
-.cache/
+# OS
+.DS_Store
+Thumbs.db
 

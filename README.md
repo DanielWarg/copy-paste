@@ -1,76 +1,66 @@
-# Copy/Paste - Nyhetsdesk Copilot
+# Copy/Paste - Editorial AI Pipeline
 
-Produktionsnära prototyp för intern redaktionsapp med RAG, lokal LLM-first (Ollama), säkerhetsramar, och fullständig dokumentation.
+Internal showreel system for editorial AI pipelines. Proves that "vibekodade" AI ideas can be turned into production-grade pipelines.
 
 ## Quick Start
 
-### Prerequisites
-
-- Docker & Docker Compose
-- Python 3.11+ (för lokal utveckling)
-- Node.js 20+ (för lokal utveckling)
-- Ollama (för lokal LLM)
-
-### Lokal Körning
-
 ```bash
-# Klona repo
-git clone <repo-url>
-cd copy-paste
+# Start all services
+docker compose up
 
-# Kopiera env-fil
-cp .env.example .env
-
-# Starta alla tjänster
-docker compose up -d
-
-# Verifiera att allt körs
-curl http://localhost:8000/health
+# Backend: http://localhost:8000
+# Frontend: http://localhost:3000
+# API Docs: http://localhost:8000/docs
 ```
 
-### Utveckling
+## Architecture
+
+**Ingest → Process (Privacy Shield) → Source Extracts → Generate (Source-Bound Draft)**
+
+### Modules
+
+1. **Event Ingestion** - Normalizes all inputs (URL, text, PDF) to standardized events
+2. **Production Bridge (Privacy Shield)** - Local anonymization using Ollama + Ministral 3B
+3. **Source-Bound Draft** - AI-generated drafts with enforced traceability
+
+## Security & GDPR
+
+- **No raw PII to external APIs. Ever.**
+- Mapping stored in server RAM only (TTL 15 min), never in client or responses
+- External API calls require `is_anonymized=true` ALWAYS, regardless of Production Mode
+- Privacy-safe logging only (no PII in logs)
+
+## Environment Variables
+
+```env
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+OPENAI_API_KEY=sk-...
+BACKEND_PORT=8000
+FRONTEND_PORT=3000
+```
+
+## Development
 
 ```bash
-# Backend (i separat terminal)
+# Backend
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn src.main:app --reload --port 8000
+uvicorn app.main:app --reload
 
-# Frontend (i separat terminal)
+# Frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-## Arkitektur
+## Showreel (Under 2 minutes)
 
-- **Frontend**: Next.js App Router + TypeScript
-- **Backend**: FastAPI + SQLAlchemy + Alembic
-- **Database**: PostgreSQL + pgvector
-- **LLM**: Ollama (ministral-3:8b)
-- **Embeddings**: Ollama (nomic-embed-text)
-
-## Säkerhet
-
-Se [docs/SECURITY_OVERVIEW.md](docs/SECURITY_OVERVIEW.md) för detaljerad säkerhetsdokumentation.
-
-Viktiga säkerhetsfunktioner:
-- SSRF-skydd för URL-fetching
-- Prompt injection guards
-- Output sanitization
-- Rate limiting per API-key
-- Audit trail för all aktivitet
-
-## Dokumentation
-
-- [Implementation Plan](docs/PLAN.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Security Overview](docs/SECURITY_OVERVIEW.md)
-- [Runbook](docs/RUNBOOK_DEV.md)
-
-## License
-
-MIT
+1. Ingest source (URL/text)
+2. Toggle Production Mode ON
+3. Show anonymization (before/after)
+4. Generate draft
+5. Prove citations (click sentence → highlight source)
+6. Block unsupported claims (show policy violations)
 

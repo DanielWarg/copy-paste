@@ -3,20 +3,17 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json* ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy application code
+# Copy application
 COPY . .
 
 # Expose port
 EXPOSE 3000
 
-# Development mode
-ENV NODE_ENV=development
-
-# Start Next.js dev server
-CMD ["npm", "run", "dev"]
+# Run development server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
