@@ -70,6 +70,12 @@ npm run dev
 * **React** + **TypeScript** + **Vite**
 * Komponenter: UniversalBox, ProductionModeToggle, DraftViewer, SourcePanel
 
+### Scout (RSS Watcher)
+* **Separate service** för RSS feed monitoring
+* **SQLite** för deduplication
+* **APScheduler** för konfigurerbart polling
+* Automatisk event creation via `/api/v1/ingest`
+
 ### Infrastructure
 * **Docker Compose** setup
 * **PostgreSQL** (för framtida expansion)
@@ -129,6 +135,12 @@ Se `LIVETEST_FINAL_RAPPORT.md` för detaljerad testrapport.
 │   │   └── App.tsx
 │   ├── package.json
 │   └── Dockerfile
+├── scout/                      # RSS Watcher service (kommande)
+│   ├── rss_watcher.py
+│   ├── dedupe_store.py
+│   ├── scheduler.py
+│   ├── feeds.yaml
+│   └── Dockerfile
 ├── scripts/
 │   ├── live_test.py           # Full pipeline test
 │   ├── test_with_api.py       # Quick test med API
@@ -150,12 +162,13 @@ Se `LIVETEST_FINAL_RAPPORT.md` för detaljerad testrapport.
 
 Systemet kan demonstreras på **under 2 minuter**:
 
-1. Ingest source (URL/text)
-2. Toggle Production Mode ON
-3. Visa anonymisering (före/efter)
-4. Generera draft
-5. Bevisa citations (click sentence → highlight source)
-6. Blockera unsupported claims (visa policy violations)
+1. Scout: RSS feeds pollas automatiskt (kommande)
+2. Ingest source (URL/text)
+3. Toggle Production Mode ON
+4. Visa anonymisering (före/efter)
+5. Generera draft
+6. Bevisa citations (click sentence → highlight source)
+7. Blockera unsupported claims (visa policy violations)
 
 ## ✅ Status
 
