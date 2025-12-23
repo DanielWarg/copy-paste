@@ -6,6 +6,14 @@ Produktionsnära redaktionellt AI-system med lokal anonymisering, source-bound d
 
 Copy/Paste är ett internt redaktionellt AI-system som bevisar att "vibekodade" AI-ideer kan omvandlas till production-grade pipelines. Systemet är linjärt och spårbart: **Ingest → Scrub (Privacy Shield) → Source Extracts → Generate (Source-Bound Draft)**.
 
+### Kommande Funktioner (Planerad)
+
+* **Privacy Shield v2** - Multi-layer defense-in-depth med verification loops och semantic leak check
+* **Audio Transcription** - Lokal transcription med Faster-Whisper för audio input
+* **AI Transparency** - Receipt-system och human-in-the-loop för blocked events
+
+Se `.cursor/plans/privacy_shield_v2_+_audio_+_transparency_26a8ebd6.plan.md` för detaljerad implementeringsplan.
+
 ### Kärnprinciper
 
 1. Journalister arbetar i **flows**, inte appar
@@ -75,6 +83,7 @@ npm run dev
 * **SQLite** för deduplication
 * **APScheduler** för konfigurerbart polling
 * Automatisk event creation via `/api/v1/ingest`
+* **Console UI** för feed administration och live event stream
 
 ### Infrastructure
 * **Docker Compose** setup
@@ -152,11 +161,12 @@ Se `LIVETEST_FINAL_RAPPORT.md` för detaljerad testrapport.
 
 ## 📚 Dokumentation
 
+* `PROJEKTSAMMANFATTNING.md` - Komplett systemöversikt
+* `ARLIG_UTVARDERING.md` - Ärlig utvärdering av implementerat system
 * `SAMMANFATTNING.md` - Detaljerad systemöversikt
 * `projektplan.md` - Projektplan med checkboxes
-* `TEST_RAPPORT.md` - Integration test rapport
-* `REDTEAM_RAPPORT.md` - Security test rapport
-* `LIVETEST_FINAL_RAPPORT.md` - Live test rapport
+* `docs/MCP.md` - MCP compatibility dokumentation
+* `.cursor/plans/` - Implementeringsplaner för kommande funktioner
 
 ## 🎬 Showreel
 
