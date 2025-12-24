@@ -1,0 +1,5 @@
+{
+  "name": "Redaktionell AI-Kontroll",
+  "description": "Operativt gränssnitt för nyhetsövervakning och AI-stöd. Helt frikopplad frontend för redaktionella flöden.",
+  "requestFramePermissions": []
+}

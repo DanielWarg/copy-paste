@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: copy-paste-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-copypaste}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: copy-paste-backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-copypaste}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      LOG_SAMPLE_RATE: ${LOG_SAMPLE_RATE:-1.0}
+      ENABLE_META: ${ENABLE_META:-false}
+      DB_HEALTH_TIMEOUT_SECONDS: ${DB_HEALTH_TIMEOUT_SECONDS:-2.0}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      PROJECT_FILES_KEY: ${PROJECT_FILES_KEY:-KaRunA0zmnvH-RDL1kKXsIr4X8XSAwHNaXqLAfvkWos=}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-network
+    restart: unless-stopped
+    # Security: read-only filesystem (except /app/data)
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    volumes:
+      - backend_data:/app/data:rw
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # Frontend temporarily disabled due to volume mount issue with colon in path
+  # To run frontend: use `make frontend-dev` locally or fix volume path
+  # frontend:
+  #   image: node:20-alpine
+  #   container_name: copy-paste-frontend
+  #   working_dir: /app
+  #   volumes:
+  #     - ${PWD}/frontend:/app
+  #     - frontend_node_modules:/app/node_modules
+  #   environment:
+  #     # Use backend service name for Docker network, fallback to localhost for local dev
+  #     VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://backend:8000}
+  #   ports:
+  #     - "${FRONTEND_PORT:-5173}:5173"
+  #   command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
+  frontend_node_modules:
+  backend_data:
+
+networks:
+  app-network:
+    driver: bridge

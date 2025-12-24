@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  core-tests:
+    name: Core Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+
+      - name: Ruff check
+        run: |
+          ruff check backend/app
+
+      - name: Ruff format check
+        run: |
+          ruff format --check backend/app
+
+      - name: mypy type check
+        run: |
+          mypy backend/app
+
+      - name: Verify Python syntax
+        run: |
+          python -m compileall backend/app -q
+
+      - name: Security: Bandit
+        run: |
+          pip install bandit[toml]
+          bandit -r backend/app -f json -o bandit-report.json || true
+          bandit -r backend/app
+
+      - name: Security: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit --desc --format=json --output=pip-audit-report.json || true
+          pip-audit --desc
+
+      - name: Security: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        with:
+          config-path: .gitleaks.toml
+          fail: true
+
+      - name: Security: Trivy (container scan)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './backend'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run core tests
+        run: |
+          make test
+        env:
+          BACKEND_URL: http://localhost:8000
+

@@ -1,0 +1,26 @@
+[project]
+name = "copy-paste-core"
+version = "2.0.0"
+description = "Copy/Paste Core Backend Foundation"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I"]
+ignore = []
+src = ["backend"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+files = ["backend/app"]
+show_error_codes = true
+
