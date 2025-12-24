@@ -17,6 +17,8 @@ from app.modules.transcripts.router import router as transcripts_router
 from app.modules.projects.router import router as projects_router
 from app.modules.autonomy_guard.router import router as autonomy_router
 from app.modules.record.router import router as record_router
+from app.modules.console.router import router as console_router
+from app.modules.privacy_shield.router import router as privacy_shield_router
 from app.routers import health, meta, ready
 
 # Create FastAPI app
@@ -53,6 +55,8 @@ app.include_router(transcripts_router, prefix="/api/v1/transcripts", tags=["tran
 app.include_router(projects_router, prefix="/api/v1/projects", tags=["projects"])
 app.include_router(autonomy_router, prefix="/api/v1/autonomy", tags=["autonomy"])
 app.include_router(record_router, prefix="/api/v1/record", tags=["record"])
+app.include_router(console_router, prefix="/api/v1", tags=["console"])
+app.include_router(privacy_shield_router, prefix="/api/v1/privacy", tags=["privacy"])
 
 # Register global exception handlers
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)

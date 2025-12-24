@@ -2,6 +2,39 @@
 
 Minimal, stable FastAPI backend foundation. Always starts, DB-optional, privacy-by-default logging, ready for modular growth.
 
+## 📚 Dokumentationskarta
+
+**Huvuddokument:**
+- **`README.md`** (denna fil) - Quick start, API docs, troubleshooting, deployment
+- **`core.md`** - CORE Backend Foundation (komplett teknisk dokumentation)
+- **`frontend.md`** - Frontend arkitektur och implementation
+- **`todo.md`** - Status, vad fungerar, vad behöver fixas, nästa steg
+
+**Security & Privacy:**
+- **`docs/journalism-safety.md`** - Source protection guidelines, retention policies
+- **`docs/security.md`** - Security measures, encryption, integrity checks
+- **`docs/opsec.md`** - Operational security, Docker hardening, egress control
+- **`docs/threat-model.md`** - Threat modeling och riskanalys
+- **`docs/user-safety.md`** - User safety guardrails, dry-run defaults
+- **`docs/sakerhet-moduler.md`** - Översikt av säkerhetsmoduler
+
+**Moduler:**
+- **`backend/app/modules/*/README.md`** - Module-specifik dokumentation
+  - `backend/app/modules/example/README.md` - Reference implementation
+  - `backend/app/modules/transcripts/README.md` - Transcripts module
+  - `backend/app/modules/projects/README.md` - Projects module
+  - `backend/app/modules/record/README.md` - Record module (audio ingest)
+  - `backend/app/modules/autonomy_guard/README.md` - Autonomy Guard module
+
+**Projektplanering:**
+- **`ARBETSPLAN.md`** - Projektplan (gammal, behöver uppdateras)
+- **`CHANGELOG.md`** - Versionshistorik
+- **`agent.md`** - Agent instructions template
+
+**Snabbstart:** Se [🚀 RUNBOOK - Quick Start](#-runbook---quick-start) nedan.
+
+---
+
 ## 🚀 RUNBOOK - Quick Start
 
 **Första gången du startar systemet:**

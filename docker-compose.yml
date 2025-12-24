@@ -31,7 +31,7 @@ services:
       ENABLE_META: ${ENABLE_META:-false}
       DB_HEALTH_TIMEOUT_SECONDS: ${DB_HEALTH_TIMEOUT_SECONDS:-2.0}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
-      PROJECT_FILES_KEY: ${PROJECT_FILES_KEY:-KaRunA0zmnvH-RDL1kKXsIr4X8XSAwHNaXqLAfvkWos=}
+      PROJECT_FILES_KEY: ${PROJECT_FILES_KEY:-g27MBZkH-jqK6hp5pT36cz15gblQnLvj0ZEyLmOeJFw=}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

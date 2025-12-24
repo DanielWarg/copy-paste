@@ -10,6 +10,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Set
+from io import BytesIO
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -346,12 +347,20 @@ def test_record_live(project_ids: Dict[str, Any]) -> Dict[str, Any]:
         if "zip_path" not in data:
             log_fail("Export missing zip_path")
         
-        # Verify zip file exists and contains manifest
-        zip_path = Path(data["zip_path"])
-        if not zip_path.exists():
-            log_fail(f"Export zip file not found: {zip_path}")
+        # zip_path is in container (/app/data/export-...zip)
+        # Read it via docker exec since it's in a Docker volume
+        zip_path_str = data["zip_path"]
+        import subprocess
+        docker_result = subprocess.run(
+            ["docker", "exec", "copy-paste-backend", "cat", zip_path_str],
+            capture_output=True,
+            check=True,
+        )
+        zip_bytes = docker_result.stdout
         
-        with zipfile.ZipFile(zip_path, "r") as zip_file:
+        # Verify zip file exists and contains manifest
+        zip_buffer = BytesIO(zip_bytes)
+        with zipfile.ZipFile(zip_buffer, "r") as zip_file:
             file_list = zip_file.namelist()
             if "manifest.json" not in file_list:
                 log_fail("Export zip missing manifest.json")
@@ -379,7 +388,7 @@ def test_record_live(project_ids: Dict[str, Any]) -> Dict[str, Any]:
                 log_fail("audio.bin appears to be unencrypted (has WAV header)")
             log_pass("Audio verified as encrypted (no WAV header)")
         
-        record_data["zip_path"] = str(zip_path)
+        record_data["zip_path"] = zip_path_str
         log_pass("Exported package (encrypted) with manifest")
     except Exception as e:
         log_fail("Export failed", str(e))

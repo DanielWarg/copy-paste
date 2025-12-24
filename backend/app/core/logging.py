@@ -204,5 +204,22 @@ def log_request(
     logger.info("http_request", extra=log_data)
 
 
+def log_privacy_safe(event_id: str, message: str, **kwargs: Any) -> None:
+    """
+    Log privacy-safe information only (convenience function for privacy modules).
+    
+    Args:
+        event_id: Event identifier
+        message: Log message
+        **kwargs: Additional privacy-safe metrics (no PII allowed)
+    """
+    logger = logging.getLogger("app")
+    safe_data = {
+        "event_id": event_id,
+        **{k: v for k, v in kwargs.items() if k.lower() not in _get_forbidden_log_keys()}
+    }
+    logger.info(message, extra=safe_data)
+
+
 # Initialize logger
 logger = setup_logging()

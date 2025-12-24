@@ -7,3 +7,5 @@ alembic==1.12.1
 psycopg2-binary==2.9.9
 cryptography==43.0.1
 python-multipart
+pyyaml>=6.0
+httpx>=0.25.0

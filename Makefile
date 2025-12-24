@@ -1,4 +1,4 @@
-.PHONY: up down restart logs health test clean lint format typecheck ci frontend-dev dev verify smoke live-verify
+.PHONY: up down restart logs health test clean lint format typecheck ci frontend-dev dev verify smoke live-verify purge
 
 # Default target
 .DEFAULT_GOAL := help
@@ -333,6 +333,14 @@ dev:
 	@echo "Frontend running on http://localhost:5173"
 	@echo "Press Ctrl+C to stop both."
 	fg
+
+purge:
+	@echo "Running Record purge (GDPR retention)..."
+	@docker-compose -f $(COMPOSE_FILE) exec backend python -m app.modules.record.purge_runner
+
+purge-dry-run:
+	@echo "Running Record purge (dry run)..."
+	@docker-compose -f $(COMPOSE_FILE) exec backend python -m app.modules.record.purge_runner --dry-run
 
 clean:
 	@echo "Stopping services and removing volumes..."

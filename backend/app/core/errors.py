@@ -63,10 +63,21 @@ def create_error_response(
     if settings.debug and debug_details:
         error_data["error"]["debug"] = debug_details
 
-    return JSONResponse(
+    # Create response with security headers (same as middleware)
+    response = JSONResponse(
         status_code=status_code,
         content=error_data,
     )
+    
+    # Set security headers (required for error responses since middleware doesn't run)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Cache-Control"] = "no-store"
+    
+    return response
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:

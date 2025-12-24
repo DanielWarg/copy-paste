@@ -1,0 +1,43 @@
+.event-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.event-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
+
+.event-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.event-actions button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.event-actions button:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.event-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.draft-preview {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+}
+

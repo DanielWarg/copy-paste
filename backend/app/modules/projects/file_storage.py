@@ -1,5 +1,6 @@
 """File storage with encryption - paranoid security."""
 import base64
+import binascii
 import hashlib
 import os
 from pathlib import Path
@@ -17,25 +18,40 @@ _STORAGE_DIR = Path("/app/data/files")  # Read-only filesystem except /app/data
 
 
 def _get_encryption_key() -> bytes:
-    """Get encryption key from environment (base64 encoded).
+    """Get encryption key from environment (base64 URL-safe encoded).
+    
+    Fernet keys are base64 URL-safe encoded (uses - and _ instead of + and /).
     
     Returns:
-        Fernet encryption key
+        Fernet encryption key (32 bytes)
         
     Raises:
-        ValueError: If PROJECT_FILES_KEY not set
+        ValueError: If PROJECT_FILES_KEY not set or invalid format
     """
     key_b64 = os.getenv("PROJECT_FILES_KEY")
     if not key_b64:
         raise ValueError(
             "PROJECT_FILES_KEY environment variable not set. "
-            "Required for file encryption. Set a base64-encoded Fernet key."
+            "Required for file encryption. Set a base64 URL-safe encoded Fernet key."
         )
     
+    # Strip whitespace (common in .env files)
+    key_b64 = key_b64.strip()
+    
     try:
-        return base64.b64decode(key_b64)
+        # Fernet uses URL-safe base64 encoding
+        key_bytes = base64.urlsafe_b64decode(key_b64)
+        # Fernet keys must be exactly 32 bytes
+        if len(key_bytes) != 32:
+            raise ValueError(
+                f"PROJECT_FILES_KEY must decode to exactly 32 bytes, got {len(key_bytes)} bytes. "
+                "Generate a new key with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+            )
+        return key_bytes
+    except binascii.Error as e:
+        raise ValueError(f"Invalid PROJECT_FILES_KEY format (must be base64 URL-safe): {e}")
     except Exception as e:
-        raise ValueError(f"Invalid PROJECT_FILES_KEY format (must be base64): {e}")
+        raise ValueError(f"Invalid PROJECT_FILES_KEY format: {e}")
 
 
 def _ensure_storage_dir() -> Path:
@@ -69,8 +85,11 @@ def encrypt_content(content: bytes) -> bytes:
     Returns:
         Encrypted content bytes
     """
-    key = _get_encryption_key()
-    fernet = Fernet(key)
+    # Fernet expects the base64-encoded key string, not decoded bytes
+    key_b64 = os.getenv("PROJECT_FILES_KEY", "").strip()
+    if not key_b64:
+        raise ValueError("PROJECT_FILES_KEY not set")
+    fernet = Fernet(key_b64.encode('ascii'))  # Fernet will decode it internally
     return fernet.encrypt(content)
 
 
@@ -83,8 +102,11 @@ def decrypt_content(encrypted_content: bytes) -> bytes:
     Returns:
         Decrypted content bytes
     """
-    key = _get_encryption_key()
-    fernet = Fernet(key)
+    # Fernet expects the base64-encoded key string, not decoded bytes
+    key_b64 = os.getenv("PROJECT_FILES_KEY", "").strip()
+    if not key_b64:
+        raise ValueError("PROJECT_FILES_KEY not set")
+    fernet = Fernet(key_b64.encode('ascii'))  # Fernet will decode it internally
     return fernet.decrypt(encrypted_content)
 
 

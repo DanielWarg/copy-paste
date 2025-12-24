@@ -24,6 +24,22 @@ class Settings(BaseSettings):
     # Database (optional)
     database_url: Optional[str] = Field(default=None, alias="DATABASE_URL")
     db_health_timeout_seconds: float = Field(default=2.0, alias="DB_HEALTH_TIMEOUT_SECONDS")
+    
+    # Ollama (for privacy module - optional)
+    ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
+    ollama_model: str = Field(default="ministral-3b", alias="OLLAMA_MODEL")
+    
+    # Mapping TTL (for privacy module - optional)
+    mapping_ttl_seconds: int = Field(default=900, alias="MAPPING_TTL_SECONDS")  # 15 minutes
+    
+    # OpenAI (for drafting module - optional)
+    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    
+    # Privacy Shield
+    llamacpp_base_url: Optional[str] = Field(default=None, alias="LLAMACPP_BASE_URL")
+    allow_external: bool = Field(default=False, alias="ALLOW_EXTERNAL")
+    privacy_max_chars: int = Field(default=50000, alias="PRIVACY_MAX_CHARS")
+    privacy_timeout_seconds: int = Field(default=10, alias="PRIVACY_TIMEOUT_SECONDS")
 
     # Security
     cors_origins: Union[str, List[str], None] = Field(
@@ -69,6 +85,10 @@ class Settings(BaseSettings):
     retention_days_default: int = Field(default=30, alias="RETENTION_DAYS_DEFAULT")
     retention_days_sensitive: int = Field(default=7, alias="RETENTION_DAYS_SENSITIVE")
     temp_file_ttl_hours: int = Field(default=24, alias="TEMP_FILE_TTL_HOURS")
+    
+    # Record module retention (GDPR purge)
+    recorder_retention_days: int = Field(default=14, alias="RECORDER_RETENTION_DAYS")
+    recorder_purge_dry_run: bool = Field(default=False, alias="RECORDER_PURGE_DRY_RUN")
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).parent.parent.parent.parent / ".env",

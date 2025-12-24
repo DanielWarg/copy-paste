@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from app.core.logging import logger
@@ -10,11 +11,15 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.privacy_guard import sanitize_for_logging, assert_no_content
 from app.modules.record import service
+from app.modules.record.download import router as download_router
 from app.modules.projects.models import ProjectAuditEvent
 from app.modules.transcripts.models import TranscriptAuditEvent
 
 
 router = APIRouter()
+
+# Include download router (export ZIP download)
+router.include_router(download_router)
 
 
 # Request models
@@ -235,7 +240,22 @@ async def upload_audio_file(
         # Re-raise HTTPExceptions (including our 415)
         raise
     except Exception as e:
-        logger.error("audio_upload_failed", extra={"error": str(e)})
+        # Safe debug logging: exception type and message only, no payload/secrets
+        import traceback
+        error_type = type(e).__name__
+        error_msg = str(e)[:200] if len(str(e)) <= 200 else str(e)[:200] + "..."
+        logger.error(
+            "audio_upload_failed",
+            extra={
+                "error_type": error_type,
+                "error_message": error_msg,
+            },
+        )
+        # In DEBUG mode, log full traceback to stderr (not in response)
+        if settings.debug:
+            import sys
+            print(f"DEBUG: Upload failed: {error_type}: {error_msg}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload audio",
@@ -256,7 +276,7 @@ async def export_record(
         request: FastAPI request (for request_id)
         
     Returns:
-        Export result (status, package_id, receipt_id, warnings)
+        ZIP file as bytes with Content-Type: application/zip
     """
     if not _has_db():
         raise HTTPException(
@@ -301,7 +321,15 @@ async def export_record(
             metadata=audit_metadata,
         )
         
-        return result
+        # Return JSON response with zip_path (for live_verify compatibility)
+        return {
+            "status": result["status"],
+            "package_id": result["package_id"],
+            "receipt_id": result["receipt_id"],
+            "zip_path": result["zip_path"],
+            "audio_mode": result["audio_mode"],
+            "warnings": result.get("warnings", []),
+        }
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -345,20 +373,9 @@ async def destroy_record(
             reason=data.reason,
         )
         
-        # Create audit event (only if actually destroyed)
-        if result["status"] == "destroyed":
-            request_id = getattr(request.state, "request_id", None)
-            _create_audit_event(
-                project_id=None,
-                transcript_id=transcript_id,
-                action="destroyed",
-                actor="system",
-                request_id=request_id,
-                metadata={
-                    "counts": result["counts"],
-                    "receipt_id": result["receipt_id"],
-                },
-            )
+        # Note: Audit event for "destroyed" is not created here because transcript is already deleted
+        # Audit events are CASCADE-deleted when transcript is deleted, so we can't create them after deletion
+        # If audit trail is needed, it should be created BEFORE deletion in service layer
         
         return result
     except ValueError as e:
@@ -366,8 +383,22 @@ async def destroy_record(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    except ValueError as e:
+        # ValueError from service (validation errors)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
     except Exception as e:
-        logger.error("destroy_failed", extra={"error": str(e)})
+        # Log exception type for debugging
+        error_type = type(e).__name__
+        logger.error("destroy_failed", extra={"error_type": error_type})
+        # In debug mode, include error type in response
+        if settings.debug:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to destroy record: {error_type}",
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to destroy record",

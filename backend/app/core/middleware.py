@@ -38,14 +38,14 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
         except Exception as e:
-            # Log error (no payloads)
+            # Log error (privacy-safe: exception class name, not str(e))
             logger.error(
                 "request_error",
                 extra={
                     "request_id": request_id,
                     "path": str(request.url.path),
                     "method": request.method,
-                    "error": str(e),
+                    "error_type": type(e).__name__,
                 },
             )
             raise

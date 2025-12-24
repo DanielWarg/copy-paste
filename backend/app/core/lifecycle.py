@@ -47,10 +47,10 @@ async def startup() -> None:
                     command.upgrade(alembic_cfg, "head")
                     logger.info("db_migrations_complete")
                 except Exception as e:
-                    logger.error("db_migration_failed", extra={"error": str(e)})
+                    logger.error("db_migration_failed", extra={"error_type": type(e).__name__})
                     # Don't fail startup - migrations might be run manually
         except Exception as e:
-            logger.error("db_init_failed", extra={"error": str(e)})
+            logger.error("db_init_failed", extra={"error_type": type(e).__name__})
             # Don't fail startup - DB might be unavailable
     else:
         logger.info("db_not_configured")
