@@ -1,0 +1,197 @@
+name: Documentation Check
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'backend/app/modules/**/README.md'
+      - 'README.md'
+      - '.github/workflows/docs-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'backend/app/modules/**/README.md'
+      - 'README.md'
+
+jobs:
+  check-documentation:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: |
+          pip install markdown-link-check
+      
+      - name: Check for missing module READMEs
+        run: |
+          echo "Checking for modules without README.md..."
+          python3 << 'EOF'
+          import os
+          import sys
+          
+          modules_dir = "backend/app/modules"
+          modules_in_main = ["example", "transcripts", "projects", "autonomy_guard", "record", "console", "privacy_shield"]
+          
+          missing_readme = []
+          for module in modules_in_main:
+              module_path = os.path.join(modules_dir, module)
+              readme_path = os.path.join(module_path, "README.md")
+              if os.path.isdir(module_path) and not os.path.exists(readme_path):
+                  missing_readme.append(module)
+          
+          if missing_readme:
+              print(f"❌ ERROR: Modules missing README.md: {', '.join(missing_readme)}")
+              sys.exit(1)
+          else:
+              print("✅ All active modules have README.md")
+          EOF
+      
+      - name: Verify documentation structure
+        run: |
+          echo "Checking documentation structure..."
+          # Check that core docs exist
+          required_docs=(
+            "README.md"
+            "docs/core.md"
+            "docs/frontend.md"
+            "docs/architecture.md"
+            "docs/getting-started.md"
+          )
+          
+          missing_docs=()
+          for doc in "${required_docs[@]}"; do
+            if [ ! -f "$doc" ]; then
+              missing_docs+=("$doc")
+            fi
+          done
+          
+          if [ ${#missing_docs[@]} -ne 0 ]; then
+            echo "❌ ERROR: Missing required documentation: ${missing_docs[*]}"
+            exit 1
+          else
+            echo "✅ All required documentation exists"
+          fi
+      
+      - name: Check markdown links (basic)
+        run: |
+          echo "Checking for broken internal links..."
+          # Basic check - look for markdown links to non-existent files
+          python3 << 'EOF'
+          import os
+          import re
+          import sys
+          
+          def find_markdown_files(root_dir):
+              """Find all markdown files."""
+              markdown_files = []
+              for root, dirs, files in os.walk(root_dir):
+                  # Skip certain directories
+                  dirs[:] = [d for d in dirs if d not in ['.git', 'node_modules', '__pycache__', 'arkiv', '.venv']]
+                  for file in files:
+                      if file.endswith('.md'):
+                          markdown_files.append(os.path.join(root, file))
+              return markdown_files
+          
+          def check_links(file_path):
+              """Check internal markdown links in a file."""
+              broken_links = []
+              try:
+                  with open(file_path, 'r', encoding='utf-8') as f:
+                      content = f.read()
+                      # Find markdown links: [text](path)
+                      link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+                      matches = re.findall(link_pattern, content)
+                      
+                      for text, link in matches:
+                          # Skip external links
+                          if link.startswith('http://') or link.startswith('https://'):
+                              continue
+                          # Skip anchor links
+                          if link.startswith('#'):
+                              continue
+                          
+                          # Resolve relative path
+                          file_dir = os.path.dirname(file_path)
+                          if file_dir:
+                              resolved_path = os.path.normpath(os.path.join(file_dir, link))
+                          else:
+                              resolved_path = os.path.normpath(link)
+                          
+                          # Check if file exists
+                          if not os.path.exists(resolved_path):
+                              broken_links.append((text, link))
+              except Exception as e:
+                  print(f"Warning: Could not check {file_path}: {e}")
+              
+              return broken_links
+          
+          all_broken = []
+          for md_file in find_markdown_files('.'):
+              broken = check_links(md_file)
+              if broken:
+                  all_broken.extend([(md_file, text, link) for text, link in broken])
+          
+          if all_broken:
+              print("❌ ERROR: Found broken internal links:")
+              for file_path, text, link in all_broken:
+                  print(f"  {file_path}: [{text}]({link})")
+              sys.exit(1)
+          else:
+              print("✅ All internal links are valid")
+          EOF
+      
+      - name: Verify module consistency
+        run: |
+          echo "Checking module consistency..."
+          python3 << 'EOF'
+          import os
+          import sys
+          import re
+          
+          # Read main.py to find registered modules
+          with open('backend/app/main.py', 'r') as f:
+              main_content = f.read()
+          
+          # Find all app.include_router calls for modules
+          router_pattern = r'app\.include_router\((\w+_router),\s+prefix=["\']/api/v1'
+          registered_modules = set()
+          for match in re.finditer(router_pattern, main_content):
+              # Try to find the import
+              router_name = match.group(1)
+              # Extract module name from import pattern
+              import_pattern = rf'from app\.modules\.(\w+)'
+              imports = re.findall(import_pattern, main_content)
+              for imp in imports:
+                  if router_name.replace('_router', '') in imp or imp in router_name:
+                      registered_modules.add(imp)
+          
+          # Also check explicit module names
+          known_modules = ["example", "transcripts", "projects", "autonomy_guard", "record", "console", "privacy_shield"]
+          registered_modules.update([m for m in known_modules if m in main_content])
+          
+          print(f"Registered modules: {sorted(registered_modules)}")
+          
+          # Check that all registered modules exist
+          modules_dir = "backend/app/modules"
+          missing_modules = []
+          for module in registered_modules:
+              module_path = os.path.join(modules_dir, module)
+              if not os.path.isdir(module_path):
+                  missing_modules.append(module)
+          
+          if missing_modules:
+              print(f"❌ ERROR: Modules registered in main.py but not found: {', '.join(missing_modules)}")
+              sys.exit(1)
+          else:
+              print("✅ All registered modules exist")
+          EOF
+

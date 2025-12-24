@@ -317,8 +317,12 @@ typecheck:
 	@echo "Running mypy type check..."
 	mypy backend/app
 
-ci: lint typecheck test
+ci: lint typecheck test check-docs
 	@echo "✅ All CI checks passed!"
+
+check-docs:
+	@echo "Checking documentation consistency..."
+	@./scripts/check_docs.sh
 
 frontend-dev:
 	@echo "Starting frontend development server..."
