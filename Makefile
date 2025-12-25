@@ -328,6 +328,10 @@ typecheck:
 ci: lint typecheck test check-docs
 	@echo "✅ All CI checks passed!"
 
+check-docs-integrity:
+	@echo "Checking documentation integrity..."
+	@python3 scripts/check_docs_integrity.py || exit 1
+
 check-docs:
 	@echo "Checking documentation consistency..."
 	@./scripts/check_docs.sh
@@ -417,11 +421,11 @@ verify-brutal-stop:
 	@docker-compose -f docker-compose.prod_brutal.yml down
 	@echo ""
 	@echo "Step 1/2: Static validation (config correctness)..."
-	@bash validate_del_a.sh
+	@bash scripts/validate_del_a.sh
 	@echo ""
 	@echo "Step 2/2: Runtime validation (proof-grade)..."
 	@echo "  (Requires: docker-compose -f docker-compose.prod_brutal.yml up -d)"
-	@bash validate_del_a_runtime.sh
+	@bash scripts/validate_del_a_runtime.sh
 	@echo ""
 	@echo "✅ BRUTAL SECURITY PROFILE: VALIDATED (config + runtime)"
 
