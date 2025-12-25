@@ -1,4 +1,4 @@
-.PHONY: up down restart logs health test clean lint format typecheck ci frontend-dev dev verify smoke live-verify purge
+.PHONY: up down restart logs health test clean lint format typecheck ci frontend-dev dev verify smoke live-verify purge verify-brutal
 
 # Default target
 .DEFAULT_GOAL := help
@@ -21,6 +21,7 @@ help:
 	@echo "  make verify       - Complete GO/NO-GO verification (all checks)"
 	@echo "  make live-verify       - Live bulletproof test (real DB + backend + fixtures)"
 	@echo "  make live-verify-reset - Live test with Docker reset (down -v before test)"
+	@echo "  make verify-brutal     - Brutal Security Profile validation (config + runtime)"
 	@echo "  make lint         - Run ruff check"
 	@echo "  make format       - Run ruff format"
 	@echo "  make typecheck    - Run mypy type check"
@@ -349,3 +350,111 @@ purge-dry-run:
 clean:
 	@echo "Stopping services and removing volumes..."
 	docker-compose -f $(COMPOSE_FILE) down -v
+
+test-privacy:
+	@echo "Testing Privacy Shield leak prevention..."
+	@python3 scripts/test_privacy_leak_repro.py || exit 1
+	@echo "✅ Privacy Shield leak prevention test passed"
+
+check-privacy-gate:
+	@echo "Checking privacy_gate usage in external LLM calls..."
+	@python3 scripts/check_privacy_gate_usage.py || exit 1
+	@echo "✅ Privacy gate usage check passed"
+
+verify-privacy-chain:
+	@echo "════════════════════════════════════════════════════════════"
+	@echo "Privacy Chain Verification"
+	@echo "════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Step 1/3: Testing Privacy Shield leak prevention..."
+	@make test-privacy || exit 1
+	@echo ""
+	@echo "Step 2/3: Checking privacy_gate usage..."
+	@make check-privacy-gate || exit 1
+	@echo ""
+	@echo "Step 3/3: Testing draft privacy chain..."
+	@python3 scripts/test_draft_privacy_chain.py || exit 1
+	@echo ""
+	@echo "✅ Privacy chain verification complete"
+
+verify-brutal:
+	@echo "════════════════════════════════════════════════════════════"
+	@echo "BRUTAL SECURITY PROFILE v3.1 - Full Validation"
+	@echo "════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Step 1/3: Static validation..."
+	@bash scripts/validate_del_a.sh || exit 1
+	@echo ""
+	@echo "Step 2/3: Starting prod_brutal services..."
+	@docker-compose -f docker-compose.prod_brutal.yml up -d || exit 1
+	@echo "Waiting for services to start..."
+	@sleep 10
+	@echo ""
+	@echo "Step 3/3: Runtime validation..."
+	@bash scripts/validate_del_a_runtime.sh || exit 1
+	@echo ""
+	@echo "✅ Brutal Security Profile validation complete!"
+
+verify-brutal-stop:
+	@echo "Stopping prod_brutal services..."
+	@docker-compose -f docker-compose.prod_brutal.yml down
+	@echo ""
+	@echo "Step 1/2: Static validation (config correctness)..."
+	@bash validate_del_a.sh
+	@echo ""
+	@echo "Step 2/2: Runtime validation (proof-grade)..."
+	@echo "  (Requires: docker-compose -f docker-compose.prod_brutal.yml up -d)"
+	@bash validate_del_a_runtime.sh
+	@echo ""
+	@echo "✅ BRUTAL SECURITY PROFILE: VALIDATED (config + runtime)"
+
+verify-phase-b:
+	@echo "════════════════════════════════════════════════════════════"
+	@echo "PHASE B VERIFICATION - Full Regression + Phase B Tests"
+	@echo "════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Step 1/3: Phase A regression (verify-brutal)..."
+	@make verify-brutal || exit 1
+	@echo ""
+	@echo "Step 2/3: Privacy chain regression (verify-privacy-chain)..."
+	@make verify-privacy-chain || exit 1
+	@echo ""
+	@echo "Step 3/3: Phase B frontend exposure verification..."
+	@bash scripts/verify_frontend_exposure.sh || exit 1
+	@echo ""
+	@echo "✅ Phase B verification complete!"
+
+verify-phase-b-runtime:
+	@bash scripts/verify_phase_b_runtime.sh
+
+verify-ui-e2e:
+	@echo "════════════════════════════════════════════════════════════"
+	@echo "UI ↔ API E2E Verification"
+	@echo "════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Step 1/3: Building frontend..."
+	@cd frontend && npm run build || exit 1
+	@echo ""
+	@echo "Step 2/3: Installing Playwright browsers (if needed)..."
+	@cd frontend && npx playwright install --with-deps chromium || exit 1
+	@echo ""
+	@echo "Step 3/3: Running E2E tests..."
+	@echo "  Note: Tests require backend to be running (make up or docker-compose up)"
+	@cd frontend && npm run test:e2e || exit 1
+	@echo ""
+	@echo "✅ UI E2E verification complete!"
+	@echo "  Test results: frontend/test-results/"
+	@echo "  HTML report: frontend/playwright-report/index.html"
+
+install-hooks:
+	@echo "Installing git hooks..."
+	@mkdir -p .git/hooks
+	@if [ -f scripts/hooks/pre-commit ]; then \
+		cp scripts/hooks/pre-commit .git/hooks/pre-commit && \
+		chmod +x .git/hooks/pre-commit && \
+		echo "✅ Pre-commit hook installed"; \
+	else \
+		echo "❌ ERROR: scripts/hooks/pre-commit not found"; \
+		exit 1; \
+	fi
+	@echo "✅ Git hooks installed successfully"

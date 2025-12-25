@@ -6,7 +6,18 @@ from pathlib import Path
 
 from app.core.logging import logger
 from app.core.config import settings
-from app.modules.privacy.privacy_service import _event_store, get_event
+
+# Privacy service (optional - may not exist)
+_event_store = {}
+def get_event(event_id):
+    """Get event by ID (stub if privacy service not available)."""
+    raise ValueError(f"Event {event_id} not found")
+
+try:
+    from app.modules.privacy.privacy_service import _event_store, get_event
+except ImportError:
+    # Privacy service not available - use stub
+    pass
 
 router = APIRouter()
 

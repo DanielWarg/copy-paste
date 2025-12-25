@@ -1,0 +1,219 @@
+{
+  "timestamp": "2025-12-24T22:11:07.562749",
+  "backend_url": "http://localhost:8000",
+  "tests": {
+    "core.health": {
+      "status": "PASS",
+      "details": {
+        "status_code": 200,
+        "response_time_ms": 3.9389999999999996,
+        "response": {
+          "status": "ok"
+        }
+      },
+      "security_analysis": {
+        "issues": [
+          "Missing request_id in health response"
+        ],
+        "strengths": []
+      },
+      "timestamp": "2025-12-24T22:11:07.571342"
+    },
+    "core.ready": {
+      "status": "PASS",
+      "details": {
+        "status_code": 200,
+        "response_time_ms": 5.597,
+        "response": {
+          "status": "ready"
+        }
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": [
+          "Graceful degradation (503 when DB down)",
+          "DB status exposed correctly"
+        ]
+      },
+      "timestamp": "2025-12-24T22:11:07.577824"
+    },
+    "core.security_headers": {
+      "status": "WARN",
+      "details": {
+        "headers": {
+          "date": "Wed, 24 Dec 2025 21:11:06 GMT",
+          "server": "uvicorn",
+          "content-length": "15",
+          "content-type": "application/json",
+          "x-request-id": "82a3d254-050b-4bb5-ba9c-64c7c9c018b6",
+          "x-content-type-options": "nosniff",
+          "x-frame-options": "DENY",
+          "x-xss-protection": "1; mode=block",
+          "referrer-policy": "no-referrer",
+          "permissions-policy": "geolocation=(), microphone=(), camera=()",
+          "cache-control": "no-store"
+        }
+      },
+      "security_analysis": {
+        "issues": [
+          "Missing security headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection"
+        ],
+        "strengths": []
+      },
+      "timestamp": "2025-12-24T22:11:07.580452"
+    },
+    "core.error_handling": {
+      "status": "PASS",
+      "details": {
+        "status_code": 422
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": [
+          "Error messages are privacy-safe"
+        ]
+      },
+      "timestamp": "2025-12-24T22:11:07.586042"
+    },
+    "core.cors": {
+      "status": "WARN",
+      "details": {
+        "status_code": 200,
+        "cors_headers": {
+          "access-control-allow-methods": "DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT",
+          "access-control-max-age": "600",
+          "access-control-allow-credentials": "true",
+          "access-control-allow-origin": "http://localhost:5173"
+        }
+      },
+      "security_analysis": {
+        "issues": [
+          "CORS not configured"
+        ],
+        "strengths": []
+      },
+      "timestamp": "2025-12-24T22:11:07.588484"
+    },
+    "transcripts.list": {
+      "status": "PASS",
+      "details": {
+        "status_code": 200,
+        "count": 0
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": [
+          "No obvious PII in response"
+        ]
+      },
+      "timestamp": "2025-12-24T22:11:07.618078"
+    },
+    "transcripts.create": {
+      "status": "PASS",
+      "details": {
+        "status_code": 200,
+        "transcript_id": 1
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": [
+          "Validation works (Pydantic)"
+        ]
+      },
+      "timestamp": "2025-12-24T22:11:07.629020"
+    },
+    "privacy_shield.mask": {
+      "status": "PASS",
+      "details": {
+        "status_code": 200
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": [
+          "PII correctly masked",
+          "Entity detection works"
+        ]
+      },
+      "timestamp": "2025-12-24T22:11:07.633071"
+    },
+    "privacy_shield.leak_prevention": {
+      "status": "FAIL",
+      "details": {
+        "status_code": 200
+      },
+      "security_analysis": {
+        "issues": [
+          "Raw PII leaked in masked output"
+        ],
+        "strengths": []
+      },
+      "timestamp": "2025-12-24T22:11:07.636012"
+    },
+    "record.create": {
+      "status": "WARN",
+      "details": {
+        "status_code": 400,
+        "error": "Unexpected status: 400"
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": []
+      },
+      "timestamp": "2025-12-24T22:11:07.641136"
+    },
+    "projects.list": {
+      "status": "PASS",
+      "details": {
+        "status_code": 200,
+        "count": 0
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": [
+          "List endpoint works"
+        ]
+      },
+      "timestamp": "2025-12-24T22:11:07.648106"
+    },
+    "console.events": {
+      "status": "PASS",
+      "details": {
+        "status_code": 200,
+        "count": 0
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": [
+          "Events endpoint works"
+        ]
+      },
+      "timestamp": "2025-12-24T22:11:07.650266"
+    },
+    "console.sources": {
+      "status": "PASS",
+      "details": {
+        "status_code": 200,
+        "count": 0
+      },
+      "security_analysis": {
+        "issues": [],
+        "strengths": [
+          "Sources endpoint works"
+        ]
+      },
+      "timestamp": "2025-12-24T22:11:07.652077"
+    }
+  },
+  "summary": {
+    "total": 13,
+    "passed": 9,
+    "failed": 1,
+    "warnings": 3,
+    "security_issues": [
+      "Missing request_id in health response",
+      "Missing security headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection",
+      "CORS not configured",
+      "Raw PII leaked in masked output"
+    ]
+  }
+}

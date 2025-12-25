@@ -1,0 +1,26 @@
+#!/bin/bash
+# Pre-commit hook: Block commits if repo path contains colon
+# This hook is version-controlled in scripts/hooks/pre-commit
+# Install with: make install-hooks
+
+CURRENT_PATH=$(pwd)
+
+if [[ "$CURRENT_PATH" == *":"* ]]; then
+    echo "❌ PRE-COMMIT BLOCKED: Repository path contains ':'"
+    echo ""
+    echo "Current path: ${CURRENT_PATH}"
+    echo ""
+    echo "This breaks Docker bind mounts and prevents verification."
+    echo ""
+    echo "FIX:"
+    echo "  1. Rename repository folder to remove ':'"
+    echo "  2. See: docs/REPO_PATH_FIX.md"
+    echo ""
+    echo "To bypass (NOT RECOMMENDED):"
+    echo "  git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+exit 0
+

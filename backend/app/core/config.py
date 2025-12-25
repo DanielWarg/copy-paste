@@ -1,137 +1,158 @@
-"""Application configuration with Pydantic Settings.
-
-Fail-fast validation on import. Reads .env from repo root.
-"""
+"""Core configuration using Pydantic Settings."""
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import List, Optional, Union, Any
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings
+import os
+import sys
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+def read_secret_file(secret_name: str, default_env_var: Optional[str] = None, required: bool = True) -> Optional[str]:
+    """
+    Read secret from Docker secret file or environment variable.
+    
+    In prod_brutal profile: secrets MUST come from /run/secrets/
+    In dev/test: fallback to environment variables
+    
+    Args:
+        secret_name: Name of secret file (e.g., 'fernet_key')
+        default_env_var: Environment variable name as fallback (e.g., 'FERNET_KEY')
+        required: If True, fail in prod_brutal if secret is missing. If False, return None.
+        
+    Returns:
+        Secret value or None if not found (and not required)
+        
+    Raises:
+        SystemExit: If secret is required in prod_brutal but missing
+    """
+    profile = os.getenv("PROFILE", "").lower()
+    environment = os.getenv("ENVIRONMENT", "").lower()
+    
+    # In prod_brutal, secrets MUST come from /run/secrets/
+    if profile == "prod_brutal" or (environment == "production" and profile == "prod_brutal"):
+        secret_path = Path(f"/run/secrets/{secret_name}")
+        if secret_path.exists():
+            try:
+                return secret_path.read_text().strip()
+            except Exception as e:
+                error_type = type(e).__name__
+                print(f"ERROR: Failed to read secret {secret_name}: {error_type}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            # If required, fail. Otherwise return None (for optional secrets like openai_api_key in prod_brutal)
+            if required:
+                print(f"ERROR: Required secret {secret_name} not found in /run/secrets/ (prod_brutal profile)", file=sys.stderr)
+                sys.exit(1)
+            return None
+    
+    # In dev/test, fallback to environment variable
+    if default_env_var:
+        return os.getenv(default_env_var)
+    
+    return None
 
 
 class Settings(BaseSettings):
     """Application settings with fail-fast validation."""
-
-    # App
-    app_name: str = "Copy/Paste Core"
-    app_version: str = "2.0.0"
-    debug: bool = False
-
-    # Server
-    host: str = "0.0.0.0"
-    port: int = 8000
-
-    # Database (optional)
-    database_url: Optional[str] = Field(default=None, alias="DATABASE_URL")
-    db_health_timeout_seconds: float = Field(default=2.0, alias="DB_HEALTH_TIMEOUT_SECONDS")
     
-    # Ollama (for privacy module - optional)
-    ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
-    ollama_model: str = Field(default="ministral-3b", alias="OLLAMA_MODEL")
+    # App metadata
+    app_name: str = Field(default="Copy/Paste Backend", description="Application name")
+    app_version: str = Field(default="1.0.0", description="Application version")
     
-    # Mapping TTL (for privacy module - optional)
-    mapping_ttl_seconds: int = Field(default=900, alias="MAPPING_TTL_SECONDS")  # 15 minutes
+    # Environment
+    environment: str = Field(default="development", description="Environment (development|production)")
+    profile: str = Field(default="dev", description="Profile (dev|prod_brutal)")
+    debug: bool = Field(default=False, description="Debug mode")
     
-    # OpenAI (for drafting module - optional)
-    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
-    
-    # Privacy Shield
-    llamacpp_base_url: Optional[str] = Field(default=None, alias="LLAMACPP_BASE_URL")
-    allow_external: bool = Field(default=False, alias="ALLOW_EXTERNAL")
-    privacy_max_chars: int = Field(default=50000, alias="PRIVACY_MAX_CHARS")
-    privacy_timeout_seconds: int = Field(default=10, alias="PRIVACY_TIMEOUT_SECONDS")
-
-    # Security
-    cors_origins: Union[str, List[str], None] = Field(
-        default=None,
-        alias="CORS_ORIGINS",
+    # Database
+    database_url: str = Field(
+        default="sqlite:///./data/app.db",
+        description="Database URL"
     )
-    api_key_header: Optional[str] = Field(default=None, alias="API_KEY_HEADER")
-
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: Any) -> List[str]:
-        """Parse CORS_ORIGINS from comma-separated string or list.
-        
-        Supports both formats:
-        - Comma-separated string: "http://localhost:5173,http://localhost:3000"
-        - List: ["http://localhost:5173", "http://localhost:3000"]
-        """
-        if v is None:
-            return ["http://localhost:5173", "http://localhost:3000"]
-        if isinstance(v, list):
-            return [origin.strip() for origin in v if origin.strip()]
-        if isinstance(v, str):
-            # Handle empty string
-            if not v.strip():
-                return ["http://localhost:5173", "http://localhost:3000"]
-            # Split by comma and strip whitespace
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return ["http://localhost:5173", "http://localhost:3000"]
-
+    
+    # CORS
+    cors_origins: List[str] = Field(
+        default=["http://localhost:3000", "http://localhost:5173"],
+        description="CORS allowed origins"
+    )
+    
     # Logging
-    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    log_format: str = Field(default="json", alias="LOG_FORMAT")
-    log_sample_rate: float = Field(default=1.0, alias="LOG_SAMPLE_RATE")
-
-    # Features
-    enable_meta: bool = Field(default=False, alias="ENABLE_META")
+    log_level: str = Field(default="INFO", description="Log level")
+    log_format: str = Field(default="json", description="Log format (json|text)")
+    log_sample_rate: float = Field(default=1.0, description="Log sampling rate (0.0-1.0)")
     
-    # Source Safety Mode (journalistic source protection)
-    # HARD MODE: In production (DEBUG=false), SOURCE_SAFETY_MODE is ALWAYS forced to True
-    source_safety_mode: bool = Field(default=True, alias="SOURCE_SAFETY_MODE")
+    # Meta endpoint
+    enable_meta: bool = Field(default=False, description="Enable /meta endpoint")
     
-    # Retention policy (days)
-    retention_days_default: int = Field(default=30, alias="RETENTION_DAYS_DEFAULT")
-    retention_days_sensitive: int = Field(default=7, alias="RETENTION_DAYS_SENSITIVE")
-    temp_file_ttl_hours: int = Field(default=24, alias="TEMP_FILE_TTL_HOURS")
+    # Privacy Shield settings
+    privacy_max_chars: int = Field(default=50000, description="Maximum characters for privacy masking")
+    privacy_timeout_seconds: int = Field(default=10, description="Privacy Shield timeout")
+    allow_external: bool = Field(default=False, description="Allow external LLM calls")
+    llamacpp_base_url: Optional[str] = Field(default=None, description="LLaMA.cpp base URL (optional)")
     
-    # Record module retention (GDPR purge)
-    recorder_retention_days: int = Field(default=14, alias="RECORDER_RETENTION_DAYS")
-    recorder_purge_dry_run: bool = Field(default=False, alias="RECORDER_PURGE_DRY_RUN")
-
-    model_config = SettingsConfigDict(
-        env_file=Path(__file__).parent.parent.parent.parent / ".env",
-        env_ignore_empty=True,
-        case_sensitive=False,
-        extra="ignore",
-    )
-
-    def model_post_init(self, __context: Any) -> None:
-        """Validate settings after initialization."""
-        # Ensure cors_origins is a list
-        if self.cors_origins is None:
-            self.cors_origins = ["http://localhost:5173", "http://localhost:3000"]
-        elif isinstance(self.cors_origins, str):
-            if not self.cors_origins.strip():
-                self.cors_origins = ["http://localhost:5173", "http://localhost:3000"]
-            else:
-                self.cors_origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-        elif isinstance(self.cors_origins, list):
-            self.cors_origins = [origin.strip() for origin in self.cors_origins if origin.strip()]
-        else:
-            self.cors_origins = ["http://localhost:5173", "http://localhost:3000"]
+    # Source Safety Mode (forced to True in production)
+    source_safety_mode: bool = Field(default=True, description="Source safety mode (forced True in production)")
+    
+    # Retention Policy
+    retention_days_default: int = Field(default=30, description="Default retention days for projects")
+    retention_days_sensitive: int = Field(default=7, description="Retention days for sensitive projects")
+    temp_file_ttl_hours: int = Field(default=24, description="TTL for temporary files (hours)")
+    
+    # Secrets (read from /run/secrets/ in prod_brutal, env vars in dev)
+    fernet_key: Optional[str] = Field(default=None, description="Fernet encryption key")
+    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
+    project_files_key: Optional[str] = Field(default=None, description="Project files encryption key (base64-encoded Fernet key)")
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
         
-        # CORS sanity guard: fail-fast if wide-open CORS in production
-        if not self.debug and "*" in self.cors_origins:
-            raise ValueError(
-                "CORS origins cannot contain '*' in production (debug=False). "
-                "This is a security risk. Set specific origins or enable debug mode."
-            )
+    def __init__(self, **kwargs):
+        """Initialize settings with secret file support."""
+        # Read secrets before calling super().__init__
+        profile = os.getenv("PROFILE", kwargs.get("profile", "dev")).lower()
+        environment = os.getenv("ENVIRONMENT", kwargs.get("environment", "development")).lower()
         
-        # HARD MODE: Force SOURCE_SAFETY_MODE=True in production
-        # This cannot be disabled in production - fail-fast if someone tries
+        # Read secrets from files or env
+        # fernet_key is REQUIRED in prod_brutal
+        fernet_secret = read_secret_file("fernet_key", "FERNET_KEY", required=True)
+        if fernet_secret:
+            kwargs["fernet_key"] = fernet_secret
+        
+        # openai_api_key is OPTIONAL in prod_brutal (should NOT exist, validated in _validate_prod_brutal)
+        openai_secret = read_secret_file("openai_api_key", "OPENAI_API_KEY", required=False)
+        if openai_secret:
+            kwargs["openai_api_key"] = openai_secret
+        
+        super().__init__(**kwargs)
+        
+        # Source Safety Mode: Force to True in production (fail-closed)
         if not self.debug and not self.source_safety_mode:
-            raise ValueError(
-                "SOURCE_SAFETY_MODE cannot be False in production (DEBUG=false). "
-                "Source protection is mandatory for newsroom operations. "
-                "Set DEBUG=true for development if you need to disable source safety mode."
-            )
+            error_msg = "SOURCE_SAFETY_MODE cannot be False in production (DEBUG=false). Source protection is mandatory for newsroom operations."
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            raise ValueError(error_msg)
         
-        # If in production and source_safety_mode was explicitly set to False, force it to True
+        # Force source_safety_mode to True in production
         if not self.debug:
             self.source_safety_mode = True
+        
+        # Validate prod_brutal profile requirements
+        if profile == "prod_brutal" or (environment == "production" and profile == "prod_brutal"):
+            self._validate_prod_brutal()
+    
+    def _validate_prod_brutal(self) -> None:
+        """Validate prod_brutal profile requirements."""
+        # Check that cloud API keys are NOT set (fail-closed)
+        if self.openai_api_key:
+            print("ERROR: OPENAI_API_KEY found in prod_brutal profile - external egress is blocked", file=sys.stderr)
+            sys.exit(1)
+        
+        # Check that required secrets exist
+        if not self.fernet_key:
+            print("ERROR: FERNET_KEY required in prod_brutal profile", file=sys.stderr)
+            sys.exit(1)
 
 
-# Fail-fast: Settings validates on import
+# Global settings instance
 settings = Settings()

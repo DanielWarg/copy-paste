@@ -69,3 +69,6 @@ alembic/versions/*.pyc
 *.tmp
 *.bak
 *.swp
+# Certificates and secrets (prod_brutal)
+certs/
+secrets/

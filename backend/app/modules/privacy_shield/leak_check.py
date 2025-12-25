@@ -8,38 +8,25 @@ def check_leaks(text: str, mode: str = "balanced") -> None:
     """
     Check for remaining PII leaks in masked text (blocking).
     
+    This is a FAIL-CLOSED check: ANY detected PII pattern = BLOCK.
+    
     Args:
         text: Masked text to check
-        mode: "strict" or "balanced"
+        mode: "strict" or "balanced" (both modes are strict for leak detection)
         
     Raises:
         PrivacyLeakError: If leaks detected
     """
     leaks = regex_masker.count_leaks(text)
     
-    # Exclude tokens from leak detection (they are safe)
-    # Tokens like [EMAIL], [PHONE], [PNR] are not leaks
-    safe_tokens = ["[EMAIL]", "[PHONE]", "[PNR]", "[ID]", "[POSTCODE]", "[ADDRESS]"]
-    text_lower = text.lower()
-    
-    # Filter out leaks that are actually just tokens
-    # If text contains only tokens and no actual PII patterns, it's safe
-    actual_leaks = {}
-    for leak_type, count in leaks.items():
-        # Only count as leak if it's not part of a token
-        # This is a conservative check - if we see the pattern but it might be in a token, skip
-        if count > 0:
-            # For now, we count all matches as potential leaks
-            # But we could improve this by checking context
-            actual_leaks[leak_type] = count
-    
-    # Count total leaks (excluding false positives from tokens)
-    total_leaks = sum(actual_leaks.values())
+    # Count total leaks - ANY leak is a failure (fail-closed)
+    total_leaks = sum(leaks.values())
     
     if total_leaks > 0:
-        leak_details = {k: v for k, v in actual_leaks.items() if v > 0}
+        # Log leak details (but don't expose in response)
+        leak_details = {k: v for k, v in leaks.items() if v > 0}
         raise PrivacyLeakError(
             f"Privacy leak detected: {total_leaks} potential PII entities remaining",
-            error_code="privacy_leak_detected"
+            error_code="pii_detected"
         )
 

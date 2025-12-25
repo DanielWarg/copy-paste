@@ -1,0 +1,83 @@
+version: '3.8'
+
+# Brutal Security Profile v3.1
+# Zero egress, mTLS proxy, no host ports, secrets via mounts
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: copy-paste-backend-brutal
+    environment:
+      - ENVIRONMENT=production
+      - PROFILE=prod_brutal
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/app.db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG=false
+      # Secrets are mounted via /run/secrets/, NOT via env vars
+      # FERNET_KEY, OPENAI_API_KEY etc. must come from secret mounts
+    networks:
+      - internal_net
+    # NO ports exposed to host
+    # Backend is only accessible via proxy over internal_net
+    volumes:
+      - ./backend/data:/app/data
+    # Security hardening
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    # Secret mounts (Docker secrets)
+    secrets:
+      - fernet_key
+      # Add other secrets as needed (openai_api_key, etc.)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  proxy:
+    image: caddy:2-alpine
+    container_name: copy-paste-proxy-brutal
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile.prod_brutal:/etc/caddy/Caddyfile:ro
+      - ./certs:/etc/caddy/certs:ro
+      - ./frontend/dist:/srv:ro  # Frontend static files (read-only)
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal_net
+      - default
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  internal_net:
+    internal: true  # CRITICAL: No egress to internet
+  default:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  fernet_key:
+    file: ./secrets/fernet_key.txt
+    # In production, use Docker secrets or external secret manager

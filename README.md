@@ -17,12 +17,7 @@ Modulärt system för journalistisk AI-assistans med fokus på integritet, säke
 - **[Frontend](docs/frontend.md)** - Frontend arkitektur och implementation
 
 **Security & Privacy:**
-- **[Security](docs/security.md)** - Security measures, encryption, integrity checks
-- **[Threat Model](docs/threat-model.md)** - Threat modeling och riskanalys
-- **[OpSec](docs/opsec.md)** - Operational security, Docker hardening, egress control
-- **[Journalism Safety](docs/journalism-safety.md)** - Source protection guidelines, retention policies
-- **[User Safety](docs/user-safety.md)** - User safety guardrails, dry-run defaults
-- **[Säkerhetsmoduler](docs/sakerhet-moduler.md)** - Översikt av säkerhetsmoduler
+- **[Security Complete](docs/security-complete.md)** ⭐ **KOMPLETT SÄKERHETSDOKUMENTATION** - All säkerhetsinformation samlad i ett dokument
 
 **Moduler:**
 - **[Record Module](backend/app/modules/record/README.md)** - Audio recording, upload, export, destruction
@@ -44,6 +39,13 @@ Modulärt system för journalistisk AI-assistans med fokus på integritet, säke
 ---
 
 ## 🚀 Quick Start
+
+### First Time Setup
+
+```bash
+# Installera git hooks (validerar repo-path, blockerar commits med kolon i path)
+make install-hooks
+```
 
 ### Snabbstart (3 kommandon)
 
@@ -216,7 +218,81 @@ COPY:PASTE/
 - ✅ Defense-in-depth (Privacy Shield)
 - ✅ Source protection (SOURCE_SAFETY_MODE)
 
-**Detaljerad dokumentation:** Se [Security](docs/security.md) och [Threat Model](docs/threat-model.md)
+**Detaljerad dokumentation:** Se [Security Complete](docs/security-complete.md) för komplett säkerhetsdokumentation
+
+### Phase B Runtime Sign-off
+
+**Verifiering:** Kör fullständig Phase B runtime-verifiering med evidence pack:
+
+```bash
+make verify-phase-b-runtime
+```
+
+**Vad PASS betyder:**
+- ✅ Backend är stabil (healthy, ingen restart-loop)
+- ✅ Zero egress uppfyllt (ingen OpenAI-nyckel krävs i prod_brutal)
+- ✅ mTLS korrekt konfigurerad (HTTPS kräver client cert)
+- ✅ Health endpoints tillgängliga via HTTP för monitoring
+- ✅ Alla Phase B säkerhetsgarantier verifierade
+
+**Output:**
+- Evidence pack: `docs/PHASE_B_RUNTIME_EVIDENCE.md`
+- Log: `phase_b_verification.log`
+- Final status: `PHASE B RUNTIME: PASS` + `EXIT_CODE=0`
+
+**CI:** Phase B verification körs automatiskt i CI och publicerar evidence pack som artifact.
+
+### UI Verification
+
+**Manual Test: Upload Del21.wav**
+
+1. Starta services:
+   ```bash
+   docker-compose -f docker-compose.prod_brutal.yml up -d
+   ```
+
+2. Starta frontend:
+   ```bash
+   cd frontend && npm run dev
+   ```
+
+3. Öppna browser: `http://localhost:5173`
+
+4. Navigera till "Inspelning" (default startvy, REAL WIRED)
+
+5. Klicka "+ Ladda upp ljudfil" och välj `Del21.wav` från projekt root
+
+6. Klicka "Upload & Transcribe"
+
+7. Vänta på transkribering (polling, max 2 minuter)
+
+8. Verifiera att transkript visas i listan när status är "KLAR"
+
+**E2E Test (Playwright):**
+
+```bash
+make verify-ui-e2e
+```
+
+**Vad testet verifierar:**
+- ✅ UI laddar och renderas korrekt
+- ✅ Upload flow fungerar end-to-end (create → upload → poll → display)
+- ✅ Request correlation (X-Request-Id sent and echoed)
+- ✅ Transcript visas när klar
+- ✅ Error handling (mTLS, network errors)
+
+**Output:**
+- Test results: `frontend/test-results/`
+- HTML report: `frontend/playwright-report/index.html`
+- Screenshots/videos: `frontend/test-results/` (vid failures)
+
+**Integration Report:** Se [UI ↔ API Integration Report](docs/UI_API_INTEGRATION_REPORT.md) för komplett mapping.
+
+**mTLS Browser Setup:** Se [MTLS Browser Setup](docs/MTLS_BROWSER_SETUP.md) för instruktioner om att installera client certifikat.
+
+**Krav:**
+- Backend måste vara igång (`make up` eller `docker-compose up`)
+- Frontend måste vara byggd (`cd frontend && npm run build`)
 
 ---
 

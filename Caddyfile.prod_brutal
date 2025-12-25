@@ -1,0 +1,65 @@
+# Brutal Security Profile v3.1 + Phase B - Caddy Configuration
+# Path-based mTLS: /ui/* and /api/* require mTLS, /health and /ready do not
+
+{
+    auto_https off
+}
+
+# HTTP -> HTTPS redirect
+:80 {
+    # Allow /health and /ready without mTLS for health checks
+    handle /health {
+        reverse_proxy http://backend:8000
+    }
+    
+    handle /ready {
+        reverse_proxy http://backend:8000
+    }
+    
+    # Redirect all other HTTP to HTTPS
+    handle {
+        redir https://{host}{uri} permanent
+    }
+}
+
+# HTTPS with mTLS enforcement (ALL paths require mTLS)
+:443 {
+    # TLS configuration - mTLS required for ALL HTTPS requests
+    tls /etc/caddy/certs/server.crt /etc/caddy/certs/server.key {
+        client_auth {
+            mode require_and_verify
+            trusted_ca_cert_file /etc/caddy/certs/ca.crt
+        }
+    }
+    
+    # All paths require mTLS (enforced by TLS client_auth above)
+    # Health endpoints are available via HTTP (port 80) without mTLS
+    reverse_proxy http://backend:8000 {
+        # Pass certificate metadata to backend for audit logging
+        header_up X-Client-Cert {tls.client.certificate_pem}
+        header_up X-Client-Cert-Subject {tls.client.certificate_subject}
+        
+        # Security headers
+        header_down X-Content-Type-Options nosniff
+        header_down X-Frame-Options DENY
+        header_down Referrer-Policy no-referrer
+        header_down Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        header_down Cache-Control no-store
+    }
+    
+    # Root redirect to /ui
+    handle {
+        redir /ui permanent
+    }
+    
+    # Custom error handling for mTLS failures
+    handle_errors {
+        @forbidden expression `{http.error.status_code} == 403`
+        rewrite @forbidden /403
+        handle /403 {
+            respond "Forbidden: Client certificate required" 403
+        }
+        
+        respond "{http.error.status_code} {http.error.status_text}"
+    }
+}

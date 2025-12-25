@@ -24,6 +24,10 @@
 
 **Copy/Paste** är ett modulärt system för journalistisk AI-assistans med fokus på integritet, säkerhet och källskydd.
 
+> ⚠️ **VIKTIGT:** Systemet körs i flera säkerhetsprofiler (dev, prod_brutal).
+> Denna guide beskriver projektstruktur och arkitektur – **inte operativa åtkomstregler**.
+> För operativa detaljer (mTLS, proxy, zero egress) se **[RUNTIME_REALITY.md](RUNTIME_REALITY.md)**.
+
 ### Kärnprinciper
 
 - **Privacy-by-default:** Inga payloads, headers eller PII i logs
@@ -31,6 +35,7 @@
 - **DB-optional:** App startar utan DB, `/ready` visar status
 - **Fail-safe:** Security headers, error handling, observability
 - **Source protection:** Integritet och säkerhet först
+- **Security profiles:** Dev (HTTP) och prod_brutal (HTTPS + mTLS, zero egress)
 
 ### Huvudfunktionalitet
 
@@ -50,13 +55,21 @@
 ```
 ┌─────────────┐
 │  Frontend   │  React + TypeScript + Vite
-│  (Port 5173)│  Mock mode eller Backend integration
+│  (Port 5173)│  REAL WIRED (no mock default)
 └──────┬──────┘
-       │ HTTP
+       │
+       │ DEV: HTTP → http://localhost:8000
+       │ PROD: HTTPS + mTLS → https://localhost (via proxy)
+       │
+┌──────▼──────────────────────────────────────┐
+│  Proxy (Caddy) - PROD ONLY                  │
+│  https://localhost (mTLS enforced)          │
+└──────┬──────────────────────────────────────┘
        │
 ┌──────▼──────────────────────────────────────┐
 │         Backend (FastAPI)                    │
-│         Port 8000                            │
+│         Port 8000 (internal_net only)       │
+│         (Not exposed externally in prod)     │
 │                                              │
 │  ┌──────────────────────────────────────┐  │
 │  │ CORE (Frozen v1.0.0)                 │  │
@@ -79,12 +92,19 @@
 └─────────────┘
 ```
 
+**⚠️ OBS:** I prod_brutal:
+- Backend är på `internal_net` (ingen extern åtkomst)
+- All frontend-kommunikation går via proxy (HTTPS + mTLS)
+- Health/ready endpoints är tillgängliga via HTTP (port 80) för monitoring
+
 ### Komponenter
 
 1. **Frontend** (`frontend/`)
    - React + TypeScript
-   - Kan köra i mock mode (utan backend)
+   - **REAL WIRED** som default (ingen mock data i default flows)
    - Integrerar med backend via `VITE_API_BASE_URL`
+   - I prod_brutal: Alla API-anrop går via proxy (HTTPS + mTLS)
+   - Mock mode är legacy/dev-hjälpmedel (inte default)
 
 2. **Backend** (`backend/`)
    - FastAPI application
@@ -271,7 +291,12 @@ open http://localhost:5173
 **Endpoints:** `POST /api/v1/record/create`, `POST /api/v1/record/{id}/audio`  
 **Status:** ✅ Fungerar (inkl. purge CLI)  
 **README:** `backend/app/modules/record/README.md`  
-**Purge:** `backend/app/modules/record/purge.py` (CLI-baserad)
+**Purge:** `backend/app/modules/record/purge.py` (CLI-baserad)  
+**Flow:** 
+1. `POST /api/v1/record/create` → Skapar project + transcript shell
+2. `POST /api/v1/record/{transcript_id}/audio` → Upload audio (multipart/form-data)
+3. Asynkron processing → Transcript status ändras till "ready"
+4. UI polling: `GET /api/v1/transcripts/{id}` (var 2:e sekund, max 2 min)
 
 #### 5. Console Module
 **Endpoints:** `GET /api/v1/events`, `GET /api/v1/sources`  
@@ -330,21 +355,29 @@ DATABASE_URL=postgresql://postgres:postgres@postgres:5432/copypaste
 
 # Security
 PROJECT_FILES_KEY=<Fernet key, base64>
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+# CORS_ORIGINS används endast i dev (i prod_brutal ersätts av mTLS)
 
 # Privacy Shield
 LLAMACPP_BASE_URL=<optional>
 ALLOW_EXTERNAL=false
-OPENAI_API_KEY=<optional>
+OPENAI_API_KEY=<optional>  # Förbjuden i prod_brutal (zero egress)
 ```
 
 ### Frontend Konfiguration
 
 **`frontend/.env`**
 ```bash
+# DEV: Direct backend access
 VITE_API_BASE_URL=http://localhost:8000
-VITE_USE_MOCK=false  # true för mock mode
+
+# PROD: Via proxy (HTTPS + mTLS)
+# VITE_API_BASE_URL=https://localhost
+
+# Mock mode är legacy/dev-hjälpmedel (inte default)
+# VITE_USE_MOCK=false
 ```
+
+**⚠️ OBS:** I prod_brutal måste frontend använda `https://localhost` (proxy) med installerat client-certifikat.
 
 ### Docker Compose
 
@@ -437,9 +470,11 @@ docker-compose exec backend alembic upgrade head
 curl http://localhost:8000/health
 
 # Kontrollera VITE_API_BASE_URL i frontend/.env
-# Standard: http://localhost:8000
+# DEV: http://localhost:8000
+# PROD: https://localhost (kräver client-certifikat)
 
-# Frontend kan köra i mock mode (VITE_USE_MOCK=true)
+# I prod_brutal: Kontrollera att client-certifikat är installerat
+# Se: docs/MTLS_BROWSER_SETUP.md
 ```
 
 ### Port redan i bruk
@@ -468,13 +503,23 @@ curl http://localhost:8000/health
 
 Varje modul har egen README i `backend/app/modules/<module>/README.md`
 
-### Security Docs
+### Security & Runtime Docs
 
-- `docs/security.md` - Security measures
-- `docs/threat-model.md` - Threat modeling
-- `docs/opsec.md` - Operational security
-- `docs/journalism-safety.md` - Source protection
-- `docs/user-safety.md` - User safety guardrails
+- `docs/security-complete.md` ⭐ **KOMPLETT SÄKERHETSDOKUMENTATION** - All säkerhetsinformation samlad i ett dokument
+- `RUNTIME_REALITY.md` ⭐ **OPERATIVA DETALJER** - prod_brutal, mTLS, proxy, zero egress, UI-integration
+  - Säkerhetsgarantier (Zero Egress, mTLS, Privacy Gate, Fail-Closed)
+  - Säkerhetsarkitektur (Network, Privacy, Access Control)
+  - Threat Model (alla identifierade hot och mitigations)
+  - Säkerhetsmoduler (Privacy Guard, Source Safety, File Encryption, etc.)
+  - Operational Security (Production Startup, Debugging, Log Policy)
+  - Journalism Safety & Källskydd
+  - User Safety (Dry-Run, Receipt System, Human-in-the-Loop)
+  - Privacy Gate (Security Guarantee, API, Implementation)
+  - Certificate Lifecycle (Create, Rotate, Revoke, Emergency)
+  - Incident Response (Security, System Failure, Data Breach)
+  - Verification & Testing
+  - Risk Assessment
+  - Compliance & Regulatory (GDPR, Journalistic Source Protection)
 
 ---
 
@@ -573,6 +618,6 @@ Varje modul har egen README i `backend/app/modules/<module>/README.md`
 
 ---
 
-**Version:** 1.0.0  
-**Senast uppdaterad:** 2025-12-24
+**Version:** 1.1.0  
+**Senast uppdaterad:** 2025-12-25
 

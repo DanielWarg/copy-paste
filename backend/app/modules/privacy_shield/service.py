@@ -55,10 +55,33 @@ async def mask_text(request: PrivacyMaskRequest, request_id: str) -> PrivacyMask
             detail=f"Input text exceeds maximum length ({settings.privacy_max_chars} characters)"
         )
     
-    # A) Baseline mask (MUST always run)
+    # A) Baseline mask (MUST always run) - Multi-pass for robustness
     try:
+        # Pass 1: Initial masking
         masked_text, entity_counts, privacy_logs = regex_masker.mask(request.text)
         provider = "regex"
+        
+        # Pass 2: Re-mask on result (catches overlaps, edge cases, missed hits)
+        # This is critical for edge cases with many repetitions
+        masked_text_pass2, additional_counts, additional_logs = regex_masker.mask(masked_text)
+        
+        # Only use pass2 if it actually changed something (avoid infinite loops)
+        if masked_text_pass2 != masked_text:
+            masked_text = masked_text_pass2
+            # Merge counts and logs
+            for key in entity_counts:
+                entity_counts[key] += additional_counts.get(key, 0)
+            privacy_logs.extend(additional_logs)
+        
+        # Pass 3 (strict mode only): One more pass for maximum safety
+        if request.mode == "strict":
+            masked_text_pass3, additional_counts3, additional_logs3 = regex_masker.mask(masked_text)
+            if masked_text_pass3 != masked_text:
+                masked_text = masked_text_pass3
+                for key in entity_counts:
+                    entity_counts[key] += additional_counts3.get(key, 0)
+                privacy_logs.extend(additional_logs3)
+                
     except Exception as e:
         error_type = type(e).__name__
         logger.error(
@@ -73,50 +96,33 @@ async def mask_text(request: PrivacyMaskRequest, request_id: str) -> PrivacyMask
             detail="Baseline masking failed"
         )
     
-    # B) Leak check (BLOCKING)
+    # B) Leak check (BLOCKING) - Must pass after multi-pass masking
     try:
         check_leaks(masked_text, mode=request.mode)
     except PrivacyLeakError as e:
-        # In strict mode: try one more aggressive mask
-        if request.mode == "strict":
-            try:
-                # Apply more aggressive masking (re-run on already masked text)
-                masked_text, additional_counts, additional_logs = regex_masker.mask(masked_text)
-                # Merge counts and logs
-                for key in entity_counts:
-                    entity_counts[key] += additional_counts.get(key, 0)
-                privacy_logs.extend(additional_logs)
-                
-                # Check again
-                check_leaks(masked_text, mode="strict")
-            except PrivacyLeakError:
-                # Still leaking - fail
-                logger.error(
-                    "privacy_mask_leak_detected",
-                    extra={
-                        "request_id": request_id,
-                        "error_type": "PrivacyLeakError",
-                        "error_code": e.error_code
-                    }
-                )
-                raise HTTPException(
-                    status_code=422,
-                    detail="Privacy leak detected after masking"
-                )
-        else:
-            # Balanced mode: fail on first leak
-            logger.error(
-                "privacy_mask_leak_detected",
-                extra={
-                    "request_id": request_id,
-                    "error_type": "PrivacyLeakError",
-                    "error_code": e.error_code
+        # After multi-pass masking, any leak is a hard failure
+        logger.error(
+            "privacy_mask_leak_detected",
+            extra={
+                "request_id": request_id,
+                "error_type": "PrivacyLeakError",
+                "error_code": e.error_code
+            }
+        )
+        from app.core.errors import create_error_response
+        from fastapi import Request
+        # Create error response with standard error shape
+        # Note: We can't access request here, so we use a generic one
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": {
+                    "code": "pii_detected",
+                    "message": "Privacy leak detected after masking",
+                    "request_id": request_id
                 }
-            )
-            raise HTTPException(
-                status_code=422,
-                detail="Privacy leak detected after masking"
-            )
+            }
+        )
     
     # C) Control check (ADVISORY, strict mode only)
     control_result = ControlResult(ok=True, reasons=[])

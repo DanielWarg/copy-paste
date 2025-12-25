@@ -9,6 +9,7 @@ from typing import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.core.cert_metadata import get_user_id, get_user_role
 from app.core.logging import log_request, logger
 
 
@@ -25,8 +26,13 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         Returns:
             Response with X-Request-Id header
         """
-        # Generate request ID
-        request_id = str(uuid.uuid4())
+        # Use incoming X-Request-Id if present, otherwise generate new
+        # This enables request correlation from frontend to backend logs
+        incoming_request_id = request.headers.get("X-Request-Id")
+        if incoming_request_id:
+            request_id = incoming_request_id
+        else:
+            request_id = str(uuid.uuid4())
 
         # Add to request state
         request.state.request_id = request_id
@@ -64,9 +70,15 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         response.headers["Cache-Control"] = "no-store"
 
+        # Extract user metadata from certificate (for audit logging only)
+        # Backend is auth-agnostic - proxy handles access control
+        user_id = get_user_id(request)
+        user_role = get_user_role(request)
+        
         # Log request (privacy-safe: no body, no headers, no client info)
         # Path is safe (no query params, no sensitive info)
         # We explicitly avoid logging: client.host, request.headers, request.url.query
+        # User metadata (user_id, user_role) is safe to log for audit purposes
         log_request(
             logger=logger,
             request_id=request_id,
@@ -74,6 +86,8 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             method=request.method,
             status_code=response.status_code,
             latency_ms=latency_ms,
+            user_id=user_id,  # For audit logging
+            user_role=user_role,  # For audit logging
         )
 
         return response

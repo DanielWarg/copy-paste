@@ -7,7 +7,7 @@ import json
 import logging
 import random
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from app.core.config import settings
 
@@ -175,6 +175,8 @@ def log_request(
     method: str,
     status_code: int,
     latency_ms: float,
+    user_id: Optional[str] = None,
+    user_role: Optional[str] = None,
 ) -> None:
     """Log HTTP request with privacy-safe structured data.
 
@@ -185,6 +187,8 @@ def log_request(
         method: HTTP method
         status_code: HTTP status code
         latency_ms: Request latency in milliseconds
+        user_id: User ID from certificate (CN) - for audit logging
+        user_role: User role from certificate (OU) - for audit logging
     """
     if not should_log():
         return
@@ -197,6 +201,12 @@ def log_request(
         "status_code": status_code,
         "latency_ms": round(latency_ms, 2),
     }
+    
+    # Add user metadata for audit logging (safe to log - these are identifiers, not PII)
+    if user_id:
+        log_data["user_id"] = user_id
+    if user_role:
+        log_data["user_role"] = user_role
 
     # Assert privacy-safe (raises if forbidden keys found)
     _assert_privacy_safe(log_data)
