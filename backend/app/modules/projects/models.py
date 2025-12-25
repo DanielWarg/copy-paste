@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy import (
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -30,6 +31,8 @@ class Project(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     started_working_at = Column(DateTime, nullable=True, index=True)  # Set on first artifact attachment
+    start_date = Column(Date, nullable=False, server_default=func.current_date(), index=True)  # Project start date
+    due_date = Column(Date, nullable=True, index=True)  # Project deadline (optional)
 
     # Relationships
     notes = relationship("ProjectNote", back_populates="project", cascade="all, delete-orphan")

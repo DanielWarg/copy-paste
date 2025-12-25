@@ -19,3 +19,4 @@ Copy/Paste-systemet implementerar strikta regler för källskydd och journalisti
 
 Se [Journalism Safety & Källskydd-sektionen i security-complete.md](security-complete.md#journalism-safety--källskydd) för fullständig beskrivning av alla principer och implementationer.
 
+

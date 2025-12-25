@@ -1,0 +1,244 @@
+{
+  "config": {
+    "configFile": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/playwright.config.ts",
+    "rootDir": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 3
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        null
+      ],
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 6,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:5174",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "record.spec.ts",
+      "file": "record.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Record Module E2E",
+          "file": "record.spec.ts",
+          "line": 26,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Recorder page loads and shows file input",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2430,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-25T16:28:45.033Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b8f16f1eb30bc8ea217-c1e902d6a5d604bc0b32",
+              "file": "record.spec.ts",
+              "line": 35,
+              "column": 3
+            },
+            {
+              "title": "Upload attempt without cert shows mTLS error state (mtls-required)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4541,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-25T16:28:45.033Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b8f16f1eb30bc8ea217-b743227ac51fe5041825",
+              "file": "record.spec.ts",
+              "line": 53,
+              "column": 3
+            },
+            {
+              "title": "Upload with cert (mtls-with-cert)",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 8148,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=/Skapar record|Laddar upp/i')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=/Skapar record|Laddar upp/i')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=/Skapar record|Laddar upp/i')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=/Skapar record|Laddar upp/i')\u001b[22m\n\n    at /Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/tests/e2e/record.spec.ts:147:71",
+                        "location": {
+                          "file": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/tests/e2e/record.spec.ts",
+                          "column": 71,
+                          "line": 147
+                        },
+                        "snippet": "  145 |\n  146 |     // Wait for creating state\n> 147 |     await expect(newPage.locator('text=/Skapar record|Laddar upp/i')).toBeVisible();\n      |                                                                       ^\n  148 |\n  149 |     // Wait for success state (with generous timeout for upload + processing)\n  150 |     await expect("
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/tests/e2e/record.spec.ts",
+                            "column": 71,
+                            "line": 147
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('text=/Skapar record|Laddar upp/i')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('text=/Skapar record|Laddar upp/i')\u001b[22m\n\n\n  145 |\n  146 |     // Wait for creating state\n> 147 |     await expect(newPage.locator('text=/Skapar record|Laddar upp/i')).toBeVisible();\n      |                                                                       ^\n  148 |\n  149 |     // Wait for success state (with generous timeout for upload + processing)\n  150 |     await expect(\n    at /Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/tests/e2e/record.spec.ts:147:71"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-25T16:28:45.034Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/test-results/record-Record-Module-E2E-Upload-with-cert-mtls-with-cert--chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/test-results/record-Record-Module-E2E-Upload-with-cert-mtls-with-cert--chromium/video.webm"
+                        },
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/test-results/record-Record-Module-E2E-Upload-with-cert-mtls-with-cert--chromium/test-failed-2.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/test-results/record-Record-Module-E2E-Upload-with-cert-mtls-with-cert--chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/evil/Desktop/EVIL/PROJECT/COPY-PASTE/frontend/tests/e2e/record.spec.ts",
+                        "column": 71,
+                        "line": 147
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2b8f16f1eb30bc8ea217-8f93d88411d7501dae7a",
+              "file": "record.spec.ts",
+              "line": 100,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-12-25T16:28:44.415Z",
+    "duration": 10853.51,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

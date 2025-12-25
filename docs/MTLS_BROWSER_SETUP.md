@@ -188,3 +188,4 @@ export default defineConfig({
 - **Inte för produktion:** Self-signed certifikat är endast för utveckling/testning
 - **Prod setup:** Använd riktiga CA-utfärdade certifikat i produktion
 
+

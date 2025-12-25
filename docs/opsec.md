@@ -17,3 +17,4 @@ Copy/Paste-systemet följer strikta operativa säkerhetsprinciper för produktio
 
 Se [Operational Security-sektionen i security-complete.md](security-complete.md#operational-security) för fullständig beskrivning av alla operativa säkerhetsprinciper.
 
+

@@ -17,3 +17,4 @@ Copy/Paste-systemet skyddar användare från oavsiktlig dataförlust och säkers
 
 Se [User Safety-sektionen i security-complete.md](security-complete.md#user-safety) för fullständig beskrivning av alla säkerhetsfunktioner.
 
+

@@ -1,14 +1,21 @@
 # UI ↔ API Integration Report
 
 **Datum:** 2025-12-25  
-**Status:** ✅ Recorder-flow REAL wired  
-**Version:** 1.1.0
+**Status:** 🔄 Foundation Complete - Rebuilding Frontend Step-by-Step  
+**Version:** 2.0.0
 
 ---
 
 ## Executive Summary
 
 Detta dokument mappar alla backend API-endpoints till frontend-komponenter och verifierar att kopplingarna fungerar end-to-end. Rapporten identifierar glapp, dead endpoints, och saknade kopplingar.
+
+**⚠️ FRONTEND REBUILD IN PROGRESS (2025-12-25):**
+- Frontend arkiverad och byggs om stegvis från grunden
+- Exakt samma visuella profil (1:1 match)
+- REAL WIRED som default (ingen mock)
+- Modul-för-modul implementation enligt Definition of Done
+- Se: `docs/UI_STYLE_TOKENS.md` för design tokens
 
 ---
 
@@ -38,6 +45,20 @@ Detta dokument mappar alla backend API-endpoints till frontend-komponenter och v
 |----------|--------|-------------|
 | `/api/v1/privacy/mask` | POST | Mask PII in text |
 
+### Projects Module (`/api/v1/projects`)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/projects` | GET | List projects (with search/filter) |
+| `/api/v1/projects` | POST | Create new project (name, sensitivity, start_date, due_date) |
+| `/api/v1/projects/{id}` | GET | Get project detail (includes start_date, due_date) |
+| `/api/v1/projects/{id}` | PATCH | Update project (name, sensitivity, status, start_date, due_date) |
+| `/api/v1/projects/{id}/attach` | POST | Attach transcripts to project |
+| `/api/v1/projects/{id}/verify` | GET | Verify project integrity |
+| `/api/v1/projects/{id}/audit` | GET | Get project audit events |
+| `/api/v1/projects/{id}/files` | POST | Upload file to project (.txt, .docx, .pdf, max 25MB) |
+| `/api/v1/projects/{id}/files` | GET | List files for project (metadata only, no content) |
+| `/api/v1/projects/security-status` | GET | Get security status |
+
 ### Record Module (`/api/v1/record`)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -47,17 +68,26 @@ Detta dokument mappar alla backend API-endpoints till frontend-komponenter och v
 | `/api/v1/record/{transcript_id}/destroy` | POST | Destroy record (dry_run default) |
 | `/api/v1/record/export/{package_id}/download` | GET | Download export ZIP |
 
-### Projects Module (`/api/v1/projects`)
+### Projects Module (`/api/v1/projects`) - UPDATED 2025-12-25
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/projects` | POST | Create project |
-| `/api/v1/projects` | GET | List projects |
-| `/api/v1/projects/{project_id}` | GET | Get project by ID |
-| `/api/v1/projects/{project_id}` | PATCH | Update project |
+| `/api/v1/projects` | POST | Create project (name, sensitivity, start_date, due_date) |
+| `/api/v1/projects` | GET | List projects (includes start_date, due_date) |
+| `/api/v1/projects/{project_id}` | GET | Get project by ID (includes start_date, due_date) |
+| `/api/v1/projects/{project_id}` | PATCH | Update project (name, sensitivity, status, start_date, due_date) |
 | `/api/v1/projects/{project_id}/audit` | GET | Get audit trail |
 | `/api/v1/projects/{project_id}/verify` | GET | Verify integrity |
 | `/api/v1/projects/{project_id}/attach` | POST | Attach transcripts |
+| `/api/v1/projects/{project_id}/files` | POST | Upload file (.txt, .docx, .pdf, max 25MB, encrypted storage) |
+| `/api/v1/projects/{project_id}/files` | GET | List files (metadata only, no content) |
 | `/api/v1/projects/security-status` | GET | Get security status |
+
+**Backend Changes (2025-12-25):**
+- Added `start_date` (Date, NOT NULL, default today) and `due_date` (Date, nullable) to Project model
+- Migration: `007_add_start_date_and_due_date_to_projects.py`
+- File upload endpoint: validates magic bytes + extension (.txt, .docx, .pdf)
+- File storage: encrypted via `file_storage.py` (Fernet), stored as `{sha256}.bin`
+- Privacy-safe: no filenames/content in logs or audit events
 
 ### Transcripts Module (`/api/v1/transcripts`)
 | Endpoint | Method | Description |
@@ -79,18 +109,21 @@ Detta dokument mappar alla backend API-endpoints till frontend-komponenter och v
 ## Frontend Components Inventory
 
 ### Pages (Primary - REAL WIRED)
-- `App.tsx` - Main app container (default page: 'recorder')
-- `views/RealRecorderPage.tsx` - **PRIMARY: Real-wired Recorder page (NO MOCK)**
-- `views/Dashboard.tsx` - Dashboard view
-- `views/Console.tsx` - Console view
-- `views/Pipeline.tsx` - Pipeline view
-- `views/Transcripts.tsx` - Transcripts archive
-- `views/Sources.tsx` - Sources management
+- `App.tsx` - Main app container with module router
+- `views/ProjectsOverview.tsx` - **✅ PROJECTS MODULE: Project Hub view (2025-12-25)**
+- `views/Project.tsx` - **✅ PROJECTS MODULE: Project detail view (folder view) (2025-12-25, needs update for file upload)**
+- `views/Recorder.tsx` - **✅ RECORD MODULE: Real-wired Recorder view (2025-12-25)**
+- `views/Dashboard.tsx` - Dashboard view (TODO)
+- `views/Console.tsx` - Console view (TODO)
+- `views/Pipeline.tsx` - Pipeline view (TODO)
+- `views/Transcripts.tsx` - Transcripts archive (TODO)
+- `views/Sources.tsx` - Sources management (TODO)
 
 ### Core API Layer (NEW - REAL WIRED)
-- `core/api/realApiClient.ts` - **PRIMARY: Centralized API client (NO MOCK, mTLS, X-Request-Id)**
-- `core/recorder/useRecorder.ts` - Custom hook for recorder flow (upload, polling, state)
-- `core/recorder/RecorderState.ts` - State types for recorder
+- `api/client.ts` - **PRIMARY: Centralized API client (NO MOCK, mTLS, X-Request-Id, DB error mapping)**
+- `api/projects.ts` - **✅ PROJECTS MODULE: Typed wrappers for projects endpoints (2025-12-25, includes updateProject, needs file upload functions)**
+- `api/record.ts` - **✅ RECORD MODULE: Typed wrappers for record endpoints (2025-12-25, updated with project_id)**
+- `components/BackendStatus.tsx` - Backend health check with mTLS detection
 
 ### Legacy Components (Still exist but not default)
 - `components/AudioUpload.tsx` - Legacy upload component (not default)
@@ -118,12 +151,10 @@ Detta dokument mappar alla backend API-endpoints till frontend-komponenter och v
 | `/api/v1/sources` | `apiClient.ts:298` | `apiClient.getSources()` | ✅ Used (legacy) |
 | `/api/v1/events/{id}/draft` | `apiClient.ts:388` | `apiClient.createDraft()` | ✅ Used (legacy) |
 | `/api/v1/privacy/mask` | `apiClient.ts:353` | `apiClient.maskContent()` | ⚠️ Stub (legacy) |
-| `/api/v1/transcripts` | `realApiClient.ts:149` | `transcriptApi.listTranscripts()` | ✅ REAL WIRED |
-| `/api/v1/transcripts/{id}` | `realApiClient.ts:139` | `transcriptApi.getTranscript()` | ✅ REAL WIRED |
-| `/api/v1/record/create` | `realApiClient.ts:99` | `recordApi.createRecord()` | ✅ REAL WIRED |
-| `/api/v1/record/{id}/audio` | `realApiClient.ts:111` | `recordApi.uploadAudio()` | ✅ REAL WIRED |
-| `/health` | `realApiClient.ts:161` | `healthApi.checkHealth()` | ✅ REAL WIRED |
-| `/ready` | `realApiClient.ts:162` | `healthApi.checkHealth()` | ✅ REAL WIRED |
+| `/api/v1/record/create` | `api/record.ts` | `createRecord()` | ✅ RECORD MODULE (2025-12-25) |
+| `/api/v1/record/{transcript_id}/audio` | `api/record.ts` | `uploadAudio()` | ✅ RECORD MODULE (2025-12-25) |
+| `/health` | `components/BackendStatus.tsx` | Direct fetch | ✅ FOUNDATION |
+| `/ready` | `components/BackendStatus.tsx` | Direct fetch | ✅ FOUNDATION |
 
 ### ✅ Recorder Flow (REAL WIRED - Primary Implementation)
 

@@ -17,3 +17,4 @@ Copy/Paste-systemet skyddar mot följande hot:
 
 Se [Threat Model-sektionen i security-complete.md](security-complete.md#threat-model) för fullständig beskrivning av varje hot, skyddsåtgärder och verifieringsmetoder.
 
+

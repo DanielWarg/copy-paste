@@ -1,0 +1,52 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e8]: REDAKTIONELLT STÖD
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Produktion
+        - button "Översikt" [ref=e12] [cursor=pointer]:
+          - img [ref=e13]
+          - generic [ref=e18]: Översikt
+        - button "Bevakning" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+          - generic [ref=e21]: Bevakning
+        - button "Arbetsflöde" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+          - generic [ref=e25]: Arbetsflöde
+      - generic [ref=e26]:
+        - generic [ref=e27]: Bibliotek & Data
+        - button "Inspelning" [ref=e28] [cursor=pointer]:
+          - img [ref=e29]
+          - generic [ref=e32]: Inspelning
+        - button "Transkriptioner" [ref=e33] [cursor=pointer]:
+          - img [ref=e34]
+          - generic [ref=e37]: Transkriptioner
+        - button "Källor" [ref=e38] [cursor=pointer]:
+          - img [ref=e39]
+          - generic [ref=e44]: Källor
+      - button "Inställningar" [ref=e46] [cursor=pointer]:
+        - img [ref=e47]
+        - generic [ref=e50]: Inställningar
+    - generic [ref=e52] [cursor=pointer]:
+      - generic [ref=e53]: JD
+      - generic [ref=e54]: Redaktör
+  - main [ref=e55]:
+    - generic [ref=e56]:
+      - generic [ref=e58]: torsdag 25 december
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - img [ref=e61]
+          - generic [ref=e63]: mTLS krävs
+        - button [ref=e64] [cursor=pointer]:
+          - img [ref=e65]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - img [ref=e76]
+        - generic [ref=e78]: Ett fel uppstod
+      - generic [ref=e79]: Nätverksfel. Kontrollera anslutning.
+      - generic [ref=e80]: "Request ID: 1766680130106-ch3k6czdk"
+      - button "Försök igen" [ref=e81] [cursor=pointer]
+```

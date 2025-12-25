@@ -1,8 +1,8 @@
 """Readiness endpoint - returns 200/503 based on DB status."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 
 from app.core.config import settings
-from app.core.database import check_db_health
+from app.core.database import check_db_health, engine
 
 router = APIRouter()
 
@@ -19,13 +19,27 @@ async def ready() -> dict:
         HTTPException: 503 if DB is configured but down
     """
     if settings.database_url:
+        if not engine:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "status": "db_uninitialized",
+                    "message": "Database engine not initialized",
+                    "reason": "Database connection not established during startup"
+                },
+            )
+        
         is_healthy = await check_db_health()
         if is_healthy:
-            return {"status": "ready"}
+            return {"status": "ready", "db": "connected"}
         else:
             raise HTTPException(
-                status_code=503,
-                detail={"status": "db_down", "message": "Database health check failed"},
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "status": "db_down",
+                    "message": "Database health check failed",
+                    "reason": "Database connection timeout or connection refused"
+                },
             )
 
     return {"status": "ready", "db": "not_configured"}

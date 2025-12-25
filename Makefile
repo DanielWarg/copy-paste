@@ -1,4 +1,4 @@
-.PHONY: up down restart logs health test clean lint format typecheck ci frontend-dev dev verify smoke live-verify purge verify-brutal
+.PHONY: up down restart logs health test clean lint format typecheck ci frontend-dev dev verify smoke live-verify purge verify-brutal check-privacy-gate check-security-invariants
 
 # Default target
 .DEFAULT_GOAL := help
@@ -6,7 +6,7 @@
 # Variables
 COMPOSE_FILE := docker-compose.yml
 BACKEND_URL := http://localhost:8000
-FRONTEND_URL := http://localhost:5173
+FRONTEND_URL := http://localhost:5174
 
 help:
 	@echo "Copy/Paste Core - Makefile Commands"
@@ -56,6 +56,13 @@ health:
 	@echo ""
 	@echo "Checking /ready endpoint..."
 	@curl -s $(BACKEND_URL)/ready | python3 -m json.tool || echo "❌ /ready failed"
+
+status:
+	@if command -v pwsh >/dev/null 2>&1; then \
+		pwsh -File scripts/status.ps1; \
+	else \
+		bash scripts/status.sh; \
+	fi
 
 smoke:
 	@echo "Running quick smoke test..."
@@ -327,7 +334,8 @@ check-docs:
 
 frontend-dev:
 	@echo "Starting frontend development server..."
-	@cd frontend && npm install && npm run dev -- --host 0.0.0.0 --port 5173
+	@echo "Frontend will connect to backend at $(BACKEND_URL)"
+	@cd frontend && VITE_API_BASE_URL=$(BACKEND_URL) npm run dev -- --host 0.0.0.0 --port 5174
 
 dev:
 	@echo "Starting backend and frontend locally..."
@@ -335,7 +343,7 @@ dev:
 	@sleep 3
 	@make frontend-dev
 	@echo "Backend running on $(BACKEND_URL)"
-	@echo "Frontend running on http://localhost:5173"
+	@echo "Frontend running on http://localhost:5174"
 	@echo "Press Ctrl+C to stop both."
 	fg
 
@@ -360,6 +368,15 @@ check-privacy-gate:
 	@echo "Checking privacy_gate usage in external LLM calls..."
 	@python3 scripts/check_privacy_gate_usage.py || exit 1
 	@echo "✅ Privacy gate usage check passed"
+
+check-security-invariants:
+	@echo "════════════════════════════════════════════════════════════"
+	@echo "Security Invariants Check (Static Gate)"
+	@echo "════════════════════════════════════════════════════════════"
+	@echo ""
+	@python3 scripts/check_security_invariants.py --static || exit 1
+	@echo ""
+	@echo "✅ Security invariants check passed"
 
 verify-privacy-chain:
 	@echo "════════════════════════════════════════════════════════════"

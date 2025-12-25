@@ -1,9 +1,9 @@
 """Projects router - API endpoints for project management."""
 import os
 from typing import Optional, List, Dict, Any
-from datetime import datetime
-from fastapi import APIRouter, Query, HTTPException, status, Request
-from pydantic import BaseModel, Field
+from datetime import datetime, date
+from fastapi import APIRouter, Query, HTTPException, status, Request, UploadFile, File
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.logging import logger
 from app.core.config import settings
@@ -12,10 +12,79 @@ from app.core.database import get_db
 from app.core.privacy_guard import sanitize_for_logging, assert_no_content
 from app.modules.projects.models import Project, ProjectNote, ProjectFile, ProjectAuditEvent
 from app.modules.projects.integrity import verify_project_integrity
+from app.modules.projects.file_storage import store_file, compute_file_hash
 from app.modules.transcripts.models import Transcript
 
 
 router = APIRouter()
+
+
+# File validation constants
+ALLOWED_PROJECT_FILE_EXTENSIONS = {".txt", ".docx", ".pdf"}
+MAX_PROJECT_FILE_SIZE = 25 * 1024 * 1024  # 25MB
+
+# Magic bytes for document formats
+PROJECT_FILE_MAGIC_BYTES = {
+    b"%PDF": "pdf",  # PDF: starts with %PDF
+    b"PK\x03\x04": "docx",  # DOCX: ZIP-based format (Office Open XML)
+}
+
+
+def validate_project_file(file_content: bytes, filename: Optional[str] = None) -> tuple:
+    """Validate project file using extension + magic bytes.
+    
+    Args:
+        file_content: File content (bytes)
+        filename: Optional filename (for extension check)
+        
+    Returns:
+        Tuple of (detected_format, is_valid)
+        
+    Raises:
+        ValueError: If file is invalid (with safe error message, no filename/path)
+    """
+    if len(file_content) == 0:
+        raise ValueError("File is empty")
+    
+    if len(file_content) > MAX_PROJECT_FILE_SIZE:
+        raise ValueError(f"File too large (max: {MAX_PROJECT_FILE_SIZE} bytes)")
+    
+    # Check magic bytes (first bytes of file)
+    detected_format = None
+    for magic, fmt in PROJECT_FILE_MAGIC_BYTES.items():
+        if file_content.startswith(magic):
+            detected_format = fmt
+            break
+    
+    # For DOCX, check at offset 0 (ZIP header)
+    if not detected_format and len(file_content) >= 4:
+        if file_content[:4] == b"PK\x03\x04":
+            detected_format = "docx"
+    
+    # Check extension if filename provided
+    if filename:
+        ext = filename.lower()
+        for allowed_ext in ALLOWED_PROJECT_FILE_EXTENSIONS:
+            if ext.endswith(allowed_ext):
+                if not detected_format:
+                    # Infer from extension
+                    detected_format = allowed_ext.lstrip(".")
+                break
+    
+    # For TXT files, we accept if extension matches (no magic bytes for plain text)
+    if filename and filename.lower().endswith(".txt"):
+        if not detected_format:
+            detected_format = "txt"
+    
+    # Require at least one match (magic bytes OR extension)
+    if not detected_format:
+        raise ValueError("Unsupported file format. Allowed: .txt, .docx, .pdf")
+    
+    # Verify detected format is in allowed list
+    if detected_format not in {"txt", "docx", "pdf"}:
+        raise ValueError("Unsupported file format. Allowed: .txt, .docx, .pdf")
+    
+    return detected_format, True
 
 
 # Request/Response models
@@ -23,6 +92,20 @@ class ProjectCreate(BaseModel):
     """Request model for creating a project."""
     name: Optional[str] = Field(None, max_length=500)
     sensitivity: str = Field(default="standard", pattern="^(standard|sensitive)$")
+    start_date: Optional[date] = Field(None, description="Project start date (defaults to today)")
+    due_date: Optional[date] = Field(None, description="Project deadline (optional)")
+    
+    @field_validator('due_date')
+    @classmethod
+    def validate_due_date(cls, v: Optional[date], info) -> Optional[date]:
+        """Validate that due_date is not before start_date."""
+        if v is None:
+            return v
+        
+        start_date = info.data.get('start_date') or date.today()
+        if v < start_date:
+            raise ValueError("due_date cannot be before start_date")
+        return v
 
 
 class ProjectUpdate(BaseModel):
@@ -30,6 +113,21 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=500)
     sensitivity: Optional[str] = Field(None, pattern="^(standard|sensitive)$")
     status: Optional[str] = Field(None, pattern="^(active|archived)$")
+    start_date: Optional[date] = Field(None, description="Project start date")
+    due_date: Optional[date] = Field(None, description="Project deadline (optional)")
+    
+    @field_validator('due_date')
+    @classmethod
+    def validate_due_date(cls, v: Optional[date], info) -> Optional[date]:
+        """Validate that due_date is not before start_date."""
+        if v is None:
+            return v
+        
+        # If start_date is also being updated, use that; otherwise we'll check against existing project
+        start_date = info.data.get('start_date')
+        if start_date and v < start_date:
+            raise ValueError("due_date cannot be before start_date")
+        return v
 
 
 class ProjectAttach(BaseModel):
@@ -106,14 +204,21 @@ def _create_audit_event(
     metadata: Optional[Dict[str, Any]] = None,
     severity: str = "info",
 ) -> None:
-    """Create audit event (sanitized for privacy)."""
+    """Create audit event (NO CONTENT, only metadata).
+    
+    Args:
+        project_id: Project ID
+        action: Action type (created|updated|file_uploaded|etc)
+        actor: Actor (system|user)
+        request_id: Request ID (for correlation)
+        metadata: Metadata dict (STRICT: counts, ids, format - NEVER content/filenames)
+        severity: Severity (info|warning|critical)
+    """
     if not _has_db():
         return
     
-    # Sanitize metadata
-    if metadata:
-        metadata = sanitize_for_logging(metadata, context="audit")
-        assert_no_content(metadata, context="audit")
+    # Sanitize metadata (ensure no content/filenames)
+    sanitized_metadata = sanitize_for_logging(metadata or {})
     
     with get_db() as db:
         audit = ProjectAuditEvent(
@@ -122,8 +227,8 @@ def _create_audit_event(
             severity=severity,
             actor=actor,
             request_id=request_id,
+            metadata_json=sanitized_metadata,
             created_at=datetime.utcnow(),
-            metadata_json=metadata,
         )
         db.add(audit)
         db.commit()
@@ -152,11 +257,16 @@ async def create_project(
     # Default name if not provided
     name = data.name or f"Untitled – {datetime.utcnow().strftime('%Y-%m-%d')}"
     
+    # Default start_date to today if not provided
+    start_date = data.start_date or date.today()
+    
     with get_db() as db:
         project = Project(
             name=name,
             sensitivity=data.sensitivity,
             status="active",
+            start_date=start_date,
+            due_date=data.due_date,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
@@ -182,6 +292,8 @@ async def create_project(
             "name": project.name,
             "sensitivity": project.sensitivity,
             "status": project.status,
+            "start_date": project.start_date.isoformat() if project.start_date else None,
+            "due_date": project.due_date.isoformat() if project.due_date else None,
             "created_at": project.created_at.isoformat(),
             "updated_at": project.updated_at.isoformat(),
             **counts,
@@ -196,18 +308,23 @@ async def list_projects(
     limit: int = Query(50, ge=1, le=200, description="Max items"),
     offset: int = Query(0, ge=0, description="Offset"),
 ) -> Dict[str, Any]:
-    """List projects with filtering and search.
+    """List projects with optional filters.
     
+    Args:
+        q: Search query (name)
+        status: Filter by status
+        sensitivity: Filter by sensitivity
+        limit: Max items
+        offset: Offset
+        
     Returns:
         List of projects with counts
     """
     if not _has_db():
-        return {
-            "items": [],
-            "total": 0,
-            "limit": limit,
-            "offset": offset,
-        }
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available",
+        )
     
     with get_db() as db:
         query = db.query(Project)
@@ -235,6 +352,8 @@ async def list_projects(
                 "name": project.name,
                 "sensitivity": project.sensitivity,
                 "status": project.status,
+                "start_date": project.start_date.isoformat() if project.start_date else None,
+                "due_date": project.due_date.isoformat() if project.due_date else None,
                 "created_at": project.created_at.isoformat(),
                 "updated_at": project.updated_at.isoformat(),
                 **counts,
@@ -279,6 +398,8 @@ async def get_project(project_id: int) -> Dict[str, Any]:
             "name": project.name,
             "sensitivity": project.sensitivity,
             "status": project.status,
+            "start_date": project.start_date.isoformat() if project.start_date else None,
+            "due_date": project.due_date.isoformat() if project.due_date else None,
             "created_at": project.created_at.isoformat(),
             "updated_at": project.updated_at.isoformat(),
             "started_working_at": project.started_working_at.isoformat() if project.started_working_at else None,
@@ -292,7 +413,7 @@ async def update_project(
     data: ProjectUpdate,
     request: Request,
 ) -> Dict[str, Any]:
-    """Update project (name, sensitivity, status only).
+    """Update project (name, sensitivity, status, dates).
     
     Args:
         project_id: Project ID
@@ -319,6 +440,15 @@ async def update_project(
         # Track changes
         changed_fields = []
         
+        # Validate due_date against start_date (if both are being updated)
+        if data.due_date is not None:
+            check_start_date = data.start_date if data.start_date is not None else project.start_date
+            if check_start_date and data.due_date < check_start_date:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="due_date cannot be before start_date",
+                )
+        
         if data.name is not None and data.name != project.name:
             project.name = data.name
             changed_fields.append("name")
@@ -330,6 +460,20 @@ async def update_project(
         if data.status is not None and data.status != project.status:
             project.status = data.status
             changed_fields.append("status")
+        
+        if data.start_date is not None and data.start_date != project.start_date:
+            # Validate that due_date (if set) is not before new start_date
+            if project.due_date and project.due_date < data.start_date:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Cannot set start_date after due_date. Update due_date first or set it to None.",
+                )
+            project.start_date = data.start_date
+            changed_fields.append("start_date")
+        
+        if data.due_date is not None and data.due_date != project.due_date:
+            project.due_date = data.due_date
+            changed_fields.append("due_date")
         
         if changed_fields:
             project.updated_at = datetime.utcnow()
@@ -353,70 +497,12 @@ async def update_project(
             "name": project.name,
             "sensitivity": project.sensitivity,
             "status": project.status,
+            "start_date": project.start_date.isoformat() if project.start_date else None,
+            "due_date": project.due_date.isoformat() if project.due_date else None,
             "created_at": project.created_at.isoformat(),
             "updated_at": project.updated_at.isoformat(),
             "started_working_at": project.started_working_at.isoformat() if project.started_working_at else None,
             **counts,
-        }
-
-
-@router.get("/{project_id}/audit")
-async def get_project_audit(
-    project_id: int,
-    limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
-) -> Dict[str, Any]:
-    """Get project audit events.
-    
-    Args:
-        project_id: Project ID
-        limit: Max items
-        offset: Offset
-        
-    Returns:
-        Audit events (sanitized)
-    """
-    if not _has_db():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available",
-        )
-    
-    with get_db() as db:
-        # Verify project exists
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project {project_id} not found",
-            )
-        
-        # Get audit events
-        query = db.query(ProjectAuditEvent).filter(
-            ProjectAuditEvent.project_id == project_id
-        )
-        
-        total = query.count()
-        events = query.order_by(ProjectAuditEvent.created_at.desc()).offset(offset).limit(limit).all()
-        
-        # Build response (metadata already sanitized)
-        items = []
-        for event in events:
-            items.append({
-                "id": event.id,
-                "action": event.action,
-                "severity": event.severity,
-                "actor": event.actor,
-                "request_id": event.request_id,
-                "created_at": event.created_at.isoformat(),
-                "metadata": event.metadata_json,  # Already sanitized when created
-            })
-        
-        return {
-            "items": items,
-            "total": total,
-            "limit": limit,
-            "offset": offset,
         }
 
 
@@ -436,27 +522,18 @@ async def verify_project(project_id: int) -> Dict[str, Any]:
             detail="Database not available",
         )
     
-    with get_db() as db:
-        # Verify project exists
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project {project_id} not found",
-            )
-    
-    # Run integrity check
     result = verify_project_integrity(project_id)
     
-    # Sanitize issues (no content, only ids/types)
+    # Sanitize issues (no content/filenames)
+    issues = result.get("issues", [])
     sanitized_issues = []
-    for issue in result.get("issues", []):
-        # Issues should already be safe (only ids/types), but verify
-        sanitized_issues.append(issue)
+    for issue in issues:
+        sanitized_issue = sanitize_for_logging(issue)
+        sanitized_issues.append(sanitized_issue)
     
     return {
-        "integrity_ok": result["integrity_ok"],
-        "checked": result["checked"],
+        "project_id": project_id,
+        "status": result.get("status", "unknown"),
         "issues": sanitized_issues,
     }
 
@@ -552,3 +629,208 @@ async def get_security_status() -> Dict[str, Any]:
         "encryption_enabled": bool(os.getenv("PROJECT_FILES_KEY")),  # Check if key is set
     }
 
+
+@router.post("/{project_id}/files", status_code=status.HTTP_201_CREATED)
+async def upload_project_file(
+    project_id: int,
+    file: UploadFile = File(...),
+    request: Request = None,
+) -> Dict[str, Any]:
+    """Upload file to project (multipart/form-data).
+    
+    Allowed formats: .txt, .docx, .pdf
+    Max size: 25MB
+    
+    Args:
+        project_id: Project ID
+        file: File upload
+        request: FastAPI request (for request_id)
+        
+    Returns:
+        Upload result (file_id, sha256, size_bytes, mime_type, created_at)
+    """
+    if not _has_db():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available",
+        )
+    
+    try:
+        # Read file content
+        file_content = await file.read()
+        
+        # Get filename safely (don't log it)
+        filename = file.filename if hasattr(file, 'filename') else None
+        
+        # Validate file (magic bytes + extension)
+        try:
+            detected_format, is_valid = validate_project_file(file_content, filename)
+        except ValueError as e:
+            request_id = getattr(request.state, "request_id", None) if request else None
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail={
+                    "error": {
+                        "code": "unsupported_media_type",
+                        "message": str(e),
+                        "request_id": request_id,
+                    }
+                },
+            )
+        
+        # Map detected format to MIME type
+        format_to_mime = {
+            "txt": "text/plain",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "pdf": "application/pdf",
+        }
+        validated_mime_type = format_to_mime.get(detected_format, "application/octet-stream")
+        
+        size_bytes = len(file_content)
+        
+        # Compute hash
+        try:
+            sha256 = compute_file_hash(file_content)
+        except Exception as e:
+            logger.error("project_file_hash_failed", extra={"error_type": type(e).__name__})
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to compute file hash",
+            )
+        
+        # Store encrypted file
+        try:
+            storage_path = store_file(file_content, sha256)
+        except Exception as e:
+            logger.error("project_file_storage_failed", extra={"error_type": type(e).__name__})
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to store file",
+            )
+        
+        with get_db() as db:
+            # Verify project exists
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project {project_id} not found",
+                )
+            
+            # Check if file already exists (by sha256)
+            existing_file = db.query(ProjectFile).filter(ProjectFile.sha256 == sha256).first()
+            if existing_file:
+                # File already exists, return existing record
+                return {
+                    "file_id": existing_file.id,
+                    "sha256": existing_file.sha256,
+                    "size_bytes": existing_file.size_bytes,
+                    "mime_type": existing_file.mime_type,
+                    "created_at": existing_file.created_at.isoformat(),
+                }
+            
+            # Create ProjectFile record
+            project_file = ProjectFile(
+                project_id=project_id,
+                original_filename=filename or "unnamed",  # Only in DB, never on disk
+                sha256=sha256,
+                mime_type=validated_mime_type,
+                size_bytes=size_bytes,
+                stored_encrypted=True,
+                storage_path=storage_path,
+                created_at=datetime.utcnow(),
+            )
+            db.add(project_file)
+            
+            # Set started_working_at if not set
+            if not project.started_working_at:
+                project.started_working_at = datetime.utcnow()
+            
+            project.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(project_file)
+            
+            # Create audit event (NO filename, NO content)
+            request_id = getattr(request.state, "request_id", None) if request else None
+            _create_audit_event(
+                project_id=project_id,
+                action="file_uploaded",
+                actor="system",
+                request_id=request_id,
+                metadata={
+                    "file_id": project_file.id,
+                    "size_bytes": size_bytes,
+                    "mime_type": validated_mime_type,
+                    # NO filename, NO content
+                },
+            )
+            
+            return {
+                "file_id": project_file.id,
+                "sha256": project_file.sha256,
+                "size_bytes": project_file.size_bytes,
+                "mime_type": project_file.mime_type,
+                "created_at": project_file.created_at.isoformat(),
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_type = type(e).__name__
+        error_msg = str(e)
+        logger.error(
+            "project_file_upload_failed",
+            extra={
+                "error_type": error_type,
+                "error_message": error_msg,
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload file",
+        )
+
+
+@router.get("/{project_id}/files")
+async def list_project_files(project_id: int) -> Dict[str, Any]:
+    """List files for a project.
+    
+    Args:
+        project_id: Project ID
+        
+    Returns:
+        List of files (metadata only, no content)
+    """
+    if not _has_db():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available",
+        )
+    
+    with get_db() as db:
+        # Verify project exists
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project {project_id} not found",
+            )
+        
+        # Get files
+        files = db.query(ProjectFile).filter(ProjectFile.project_id == project_id).order_by(ProjectFile.created_at.desc()).all()
+        
+        items = []
+        for f in files:
+            items.append({
+                "id": f.id,
+                "sha256": f.sha256,
+                "size_bytes": f.size_bytes,
+                "mime_type": f.mime_type,
+                "original_filename": f.original_filename,  # Safe: only in DB, never logged
+                "created_at": f.created_at.isoformat(),
+            })
+        
+        return {
+            "items": items,
+            "total": len(items),
+        }

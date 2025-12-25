@@ -1143,3 +1143,35 @@ För frågor om säkerhet:
 **Version:** 1.0.0  
 **Senast uppdaterad:** 2025-12-25
 
+---
+
+## AI-Assistent Regler (Maskinläsbar Säkerhet)
+
+**Detta avsnitt är obligatoriskt för alla AI-assistenter som arbetar i detta repo.**
+
+### Obligatoriska Dokument
+Innan du gör ändringar, läs:
+1. `docs/agent.md` - Konstitution och arbetsregler
+2. `docs/security-complete.md` (detta dokument) - Exakt säkerhetssemantik
+3. `docs/core.md` - Module Contract och backend-regler
+4. `docs/UI_STYLE_TOKENS.md` - UI-stil lås
+
+### Security Invariants (Testbara Checks)
+Alla invariants är kodade i `scripts/check_security_invariants.py` och körs via:
+- `make check-security-invariants` (statisk gate)
+- `make verify-brutal` (runtime gate)
+
+**Om en invariant bryts → verifieringen failar → ändringen stoppas.**
+
+### Förändringsregel
+Varje ändring som berör säkerhet måste:
+1. Köra `make check-security-invariants`
+2. Köra `make verify-brutal` (eller relevant verify-*)
+3. Uppdatera `docs/security-complete.md` om semantik ändras
+4. Uppdatera `docs/UI_API_INTEGRATION_REPORT.md` om UI↔API ändras
+
+### Superprompt
+För att säkerställa att olika AI-modeller följer samma regler, använd `docs/AGENT_SUPERPROMPT.md` som startregel.
+
+**Detta gör säkerheten maskinläsbar, testbar och fail-closed.**
+
