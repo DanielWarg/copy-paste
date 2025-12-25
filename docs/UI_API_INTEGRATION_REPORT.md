@@ -112,7 +112,7 @@ Detta dokument mappar alla backend API-endpoints till frontend-komponenter och v
 - `App.tsx` - Main app container with module router
 - `views/ProjectsOverview.tsx` - **✅ PROJECTS MODULE: Project Hub view (2025-12-25)**
 - `views/Project.tsx` - **✅ PROJECTS MODULE: Project detail view (folder view) (2025-12-25, needs update for file upload)**
-- `views/Recorder.tsx` - **✅ RECORD MODULE: Real-wired Recorder view (2025-12-25)**
+- `views/Recorder.tsx` - **✅ TRANSCRIBERING MODULE: Transkribering view (ladda upp ljudfil för transkribering) (2025-12-25)**
 - `views/Dashboard.tsx` - Dashboard view (TODO)
 - `views/Console.tsx` - Console view (TODO)
 - `views/Pipeline.tsx` - Pipeline view (TODO)
@@ -151,12 +151,14 @@ Detta dokument mappar alla backend API-endpoints till frontend-komponenter och v
 | `/api/v1/sources` | `apiClient.ts:298` | `apiClient.getSources()` | ✅ Used (legacy) |
 | `/api/v1/events/{id}/draft` | `apiClient.ts:388` | `apiClient.createDraft()` | ✅ Used (legacy) |
 | `/api/v1/privacy/mask` | `apiClient.ts:353` | `apiClient.maskContent()` | ⚠️ Stub (legacy) |
-| `/api/v1/record/create` | `api/record.ts` | `createRecord()` | ✅ RECORD MODULE (2025-12-25) |
-| `/api/v1/record/{transcript_id}/audio` | `api/record.ts` | `uploadAudio()` | ✅ RECORD MODULE (2025-12-25) |
+| `/api/v1/record/create` | `api/record.ts` | `createRecord()` | ✅ TRANSCRIBERING MODULE (2025-12-25) |
+| `/api/v1/record/{transcript_id}/audio` | `api/record.ts` | `uploadAudio()` | ✅ TRANSCRIBERING MODULE (2025-12-25) |
 | `/health` | `components/BackendStatus.tsx` | Direct fetch | ✅ FOUNDATION |
 | `/ready` | `components/BackendStatus.tsx` | Direct fetch | ✅ FOUNDATION |
 
-### ✅ Recorder Flow (REAL WIRED - Primary Implementation)
+### ✅ Transkribering Flow (REAL WIRED - Primary Implementation)
+
+**Notis:** "Transkribering" är nuvarande modul för att ladda upp ljudfiler och få transkriptioner. "Recorder (Inspelning)" är en planerad framtida modul för direkt inspelning i webbläsaren (mic) med stream/chunk upload och live status.
 
 | Backend Endpoint | Frontend File | Component/Method | Status |
 |-----------------|---------------|------------------|--------|
@@ -165,16 +167,17 @@ Detta dokument mappar alla backend API-endpoints till frontend-komponenter och v
 | `GET /api/v1/transcripts/{id}` | `useRecorder.ts:24` | `transcriptApi.getTranscript()` (polling) | ✅ REAL WIRED |
 | `GET /api/v1/transcripts` | `RealRecorderPage.tsx:36` | `transcriptApi.listTranscripts()` | ✅ REAL WIRED |
 
-**Flow (RealRecorderPage):**
-1. User selects audio file → `RealRecorderPage` component
-2. `POST /api/v1/record/create` → Creates project + transcript shell (via `recordApi.createRecord()`)
-3. `POST /api/v1/record/{transcript_id}/audio` → Uploads audio file (multipart/form-data via `recordApi.uploadAudio()`)
-4. Poll `GET /api/v1/transcripts/{id}` → `useRecorder` hook polls every 2s (max 60 attempts, 2 min timeout)
-5. `GET /api/v1/transcripts` → Refreshes list to show new transcript (via `transcriptApi.listTranscripts()`)
+**Flow (Transkribering view - Recorder.tsx):**
+1. User selects audio file → `Recorder` component
+2. `POST /api/v1/record/create` → Creates project + transcript shell (via `createRecord()`)
+3. `POST /api/v1/record/{transcript_id}/audio` → Uploads audio file (multipart/form-data via `uploadAudio()`)
+4. Success state shows record_id, sha256, size, format
+5. User can upload new file or navigate away
 
-**Legacy Flow (AudioUpload component - still exists but not default):**
-- `AudioUpload.tsx` still exists but is not the default implementation
-- `RealRecorderPage.tsx` is the primary REAL WIRED implementation
+**Navigation:**
+- Menypunkt: "Transkribering" (tidigare "Recorder")
+- Route: `transkribering` (internt page-id)
+- Komponent: `views/Recorder.tsx` (behåller filnamn för kompatibilitet)
 
 **Request Correlation:**
 - All requests include `X-Request-Id` header

@@ -9,3 +9,4 @@ cryptography==43.0.1
 python-multipart
 pyyaml>=6.0
 httpx>=0.25.0
+faster-whisper>=0.10.0

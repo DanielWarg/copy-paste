@@ -5,11 +5,12 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, date
 from uuid import uuid4
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.logging import logger
 from app.core.privacy_guard import sanitize_for_logging, assert_no_content, compute_integrity_hash
 from app.modules.projects.models import Project
 from app.modules.transcripts.models import Transcript
@@ -127,6 +128,7 @@ def create_record_project(
                 status="active",
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
+                start_date=date.today(),  # Required field
             )
             db.add(project)
             db.commit()
@@ -224,7 +226,7 @@ def upload_audio(
         if not transcript:
             raise ValueError(f"Transcript {transcript_id} not found")
         
-        # Check if audio asset already exists
+        # Check if audio asset already exists for this transcript
         existing = db.query(AudioAsset).filter(AudioAsset.transcript_id == transcript_id).first()
         if existing:
             # Update existing
@@ -236,21 +238,137 @@ def upload_audio(
             db.refresh(existing)
             file_id = existing.id
         else:
-            # Create new
-            audio_asset = AudioAsset(
-                project_id=transcript.project_id,
-                transcript_id=transcript_id,
-                sha256=sha256,
-                mime_type=validated_mime_type,
-                size_bytes=size_bytes,
-                storage_path=storage_path,
-                destroy_status="none",  # Explicit default
-                created_at=datetime.utcnow(),
-            )
-            db.add(audio_asset)
-            db.commit()
-            db.refresh(audio_asset)
-            file_id = audio_asset.id
+            # Check if file with same sha256 already exists (reuse it)
+            existing_file = db.query(AudioAsset).filter(AudioAsset.sha256 == sha256).first()
+            if existing_file:
+                # File already exists - update it to link to this transcript
+                # Since sha256 is unique, we can't create a duplicate, so update the existing one
+                existing_file.transcript_id = transcript_id
+                existing_file.project_id = transcript.project_id
+                existing_file.mime_type = validated_mime_type
+                existing_file.size_bytes = size_bytes
+                # Keep existing storage_path (file is already stored)
+                db.commit()
+                db.refresh(existing_file)
+                file_id = existing_file.id
+            else:
+                # Create new
+                audio_asset = AudioAsset(
+                    project_id=transcript.project_id,
+                    transcript_id=transcript_id,
+                    sha256=sha256,
+                    mime_type=validated_mime_type,
+                    size_bytes=size_bytes,
+                    storage_path=storage_path,
+                    destroy_status="none",  # Explicit default
+                    created_at=datetime.utcnow(),
+                )
+                db.add(audio_asset)
+                db.commit()
+                db.refresh(audio_asset)
+                file_id = audio_asset.id
+        
+        # Trigger automatic transcription (async, non-blocking)
+        # Update transcript status to "transcribing" but don't block on transcription
+        transcript.status = "transcribing"
+        db.commit()
+        
+        # Start transcription in background (non-blocking)
+        # Use threading to avoid blocking the upload response
+        import threading
+        
+        # Copy file_content to avoid issues with thread context
+        file_content_copy = file_content[:]  # Create a copy
+        transcript_language = transcript.language
+        transcript_id_copy = transcript_id
+        
+        def transcribe_in_background():
+            """Background transcription task."""
+            from app.core.logging import logger as bg_logger
+            try:
+                # Try to import transcription module (may not exist if faster-whisper not installed)
+                try:
+                    from app.modules.ingestion.transcription import transcribe_audio
+                except (ImportError, ModuleNotFoundError) as e:
+                    bg_logger.warning(
+                        "transcription_module_not_available",
+                        extra={
+                            "transcript_id": transcript_id_copy,
+                            "error": str(e),
+                        },
+                    )
+                    # Set status back to uploaded and exit
+                    with get_db() as db_bg:
+                        transcript_bg = db_bg.query(Transcript).filter(Transcript.id == transcript_id_copy).first()
+                        if transcript_bg:
+                            transcript_bg.status = "uploaded"
+                            db_bg.commit()
+                    return
+                
+                from app.modules.transcripts import service as transcripts_service
+                
+                # Transcribe audio (this can take time for large files)
+                full_transcript, segments, metadata = transcribe_audio(
+                    file_content=file_content_copy,
+                    language=transcript_language,
+                    filename=filename,
+                )
+                
+                # Save segments to transcript
+                with get_db() as db_bg:
+                    transcript_bg = db_bg.query(Transcript).filter(Transcript.id == transcript_id_copy).first()
+                    if transcript_bg:
+                        transcripts_service.upsert_segments(transcript_id_copy, segments)
+                        
+                        # Update transcript status to "ready" and add duration
+                        transcript_bg.status = "ready"
+                        transcript_bg.duration_seconds = metadata.get("duration_seconds")
+                        transcript_bg.updated_at = datetime.utcnow()
+                        db_bg.commit()
+                        
+                        bg_logger.info(
+                            "transcription_complete",
+                            extra={
+                                "transcript_id": transcript_id_copy,
+                                "segment_count": len(segments),
+                                "duration_seconds": metadata.get("duration_seconds"),
+                            },
+                        )
+            except ImportError as e:
+                # faster-whisper not installed - just log and keep status as "uploaded"
+                bg_logger.warning(
+                    "transcription_not_available",
+                    extra={
+                        "transcript_id": transcript_id_copy,
+                        "error": str(e),
+                    },
+                )
+                with get_db() as db_bg:
+                    transcript_bg = db_bg.query(Transcript).filter(Transcript.id == transcript_id_copy).first()
+                    if transcript_bg:
+                        transcript_bg.status = "uploaded"
+                        db_bg.commit()
+            except Exception as e:
+                # Transcription failed - log but don't fail upload
+                error_type = type(e).__name__
+                bg_logger.error(
+                    "transcription_failed",
+                    extra={
+                        "transcript_id": transcript_id_copy,
+                        "error_type": error_type,
+                        "error_message": str(e)[:200],
+                    },
+                )
+                # Keep transcript in "uploaded" status (not "ready")
+                with get_db() as db_bg:
+                    transcript_bg = db_bg.query(Transcript).filter(Transcript.id == transcript_id_copy).first()
+                    if transcript_bg:
+                        transcript_bg.status = "uploaded"
+                        db_bg.commit()
+        
+        # Start background transcription thread
+        transcription_thread = threading.Thread(target=transcribe_in_background, daemon=True)
+        transcription_thread.start()
         
         return {
             "status": "ok",

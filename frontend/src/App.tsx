@@ -2,7 +2,7 @@
  * Main App Component
  * 
  * UI Shell with module routing.
- * Default page: 'recorder' (will be implemented in Record module)
+ * Default page: 'transcripts' (Projects Overview)
  */
 
 import { useState, useEffect } from 'react';
@@ -35,7 +35,7 @@ const App: React.FC = () => {
 
   const handleCreateRecord = (projectId: number) => {
     setSelectedProjectId(projectId);
-    setPage('recorder');
+    setPage('transkribering');
   };
 
   const renderContent = () => {
@@ -52,7 +52,7 @@ const App: React.FC = () => {
           );
         }
         return <ProjectsOverview onProjectSelect={handleProjectSelect} />;
-      case 'recorder':
+      case 'transkribering':
         return <Recorder projectId={selectedProjectId || undefined} />;
       case 'overview':
         return (

@@ -69,6 +69,10 @@ class Settings(BaseSettings):
         default="sqlite:///./data/app.db",
         description="Database URL"
     )
+    db_health_timeout_seconds: float = Field(
+        default=2.0,
+        description="Database health check timeout in seconds"
+    )
     
     # CORS
     cors_origins: List[str] = Field(

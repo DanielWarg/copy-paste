@@ -91,7 +91,13 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         JSONResponse with error shape
     """
     # Use generic message in production, actual detail in debug
-    if settings.debug:
+    # Handle dict detail (from ready endpoint)
+    if isinstance(exc.detail, dict):
+        if settings.debug:
+            message = exc.detail.get("message", "HTTP error occurred")
+        else:
+            message = exc.detail.get("message", "Request failed")
+    elif settings.debug:
         message = exc.detail if isinstance(exc.detail, str) else "HTTP error occurred"
     else:
         message = "Request failed"

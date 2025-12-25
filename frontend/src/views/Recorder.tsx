@@ -1,5 +1,5 @@
 /**
- * Recorder View
+ * Transkribering View
  * 
  * Full implementation of record creation and audio upload flow.
  * States: idle → creating → created → uploading → success/error
@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createRecord, uploadAudio, CreateRecordResponse, UploadAudioResponse } from '../api/record';
 import { getProject, Project } from '../api/projects';
-import { ApiError } from '../api/client';
+import { ApiError, API_BASE_URL } from '../api/client';
 import { Mic, Upload, Loader2, CheckCircle2, AlertCircle, X, Folder } from 'lucide-react';
 
 type RecorderState = 
@@ -117,11 +117,29 @@ export function Recorder({ projectId }: RecorderProps) {
       setState({ status: 'success', record, upload });
 
     } catch (error: any) {
-      const apiError = error as ApiError;
+      // Better error handling - check if it's already an ApiError
+      let apiError: ApiError;
+      if (error && typeof error === 'object' && 'code' in error) {
+        apiError = error as ApiError;
+      } else {
+        // Wrap unknown errors
+        apiError = {
+          code: 'unknown',
+          message: error?.message || String(error) || 'Ett okänt fel uppstod',
+          request_id: '',
+          originalError: error,
+        };
+      }
+      
       setState({ status: 'error', error: apiError });
       
       // Brutal-safe logging: only error code + request_id
-      console.error('[Recorder Error]', apiError.code, apiError.request_id);
+      console.error('[Transkribering Error]', {
+        code: apiError.code,
+        message: apiError.message,
+        request_id: apiError.request_id,
+        url: API_BASE_URL + '/api/v1/record/create',
+      });
     }
   };
 
@@ -142,7 +160,7 @@ export function Recorder({ projectId }: RecorderProps) {
             <div className="max-w-5xl mx-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-serif font-bold text-zinc-900 dark:text-white">
-                  Inspelning & Transkribering
+                  Transkribering
                 </h2>
                 {project && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-700 rounded-sm text-sm">
@@ -242,7 +260,7 @@ export function Recorder({ projectId }: RecorderProps) {
               <div className="bg-white dark:bg-zinc-800 p-6 rounded-sm shadow-sm border border-zinc-200 dark:border-zinc-700">
                 <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
                   <Loader2 size={20} className="animate-spin" />
-                  <span>Skapar record...</span>
+                  <span>Initierar transkribering...</span>
                 </div>
               </div>
             </div>

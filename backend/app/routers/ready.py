@@ -2,13 +2,13 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.core.config import settings
-from app.core.database import check_db_health, engine
+from app.core.database import check_db_health
 
 router = APIRouter()
 
 
 @router.get("/ready")
-async def ready() -> dict:
+def ready() -> dict:
     """Readiness check endpoint.
 
     Returns:
@@ -19,6 +19,8 @@ async def ready() -> dict:
         HTTPException: 503 if DB is configured but down
     """
     if settings.database_url:
+        # Import engine at runtime to get current value (not cached import)
+        from app.core.database import engine
         if not engine:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -29,7 +31,13 @@ async def ready() -> dict:
                 },
             )
         
-        is_healthy = await check_db_health()
+        # Use sync check directly - it's fast enough (0.002-0.005s)
+        from app.core.database import _check_db_health_sync
+        try:
+            is_healthy = _check_db_health_sync()
+        except Exception:
+            is_healthy = False
+        
         if is_healthy:
             return {"status": "ready", "db": "connected"}
         else:

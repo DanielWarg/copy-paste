@@ -251,11 +251,10 @@ async def upload_audio_file(
                 "error_message": error_msg,
             },
         )
-        # In DEBUG mode, log full traceback to stderr (not in response)
-        if settings.debug:
-            import sys
-            print(f"DEBUG: Upload failed: {error_type}: {error_msg}", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+        # Always log full traceback to stderr for debugging (not in response)
+        import sys
+        print(f"DEBUG: Upload failed: {error_type}: {error_msg}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload audio",

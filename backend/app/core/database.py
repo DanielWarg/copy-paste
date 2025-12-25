@@ -4,6 +4,7 @@ DB is optional - app can start without DATABASE_URL.
 Health check has hard timeout to prevent blocking.
 """
 import asyncio
+import concurrent.futures
 from contextlib import contextmanager
 from typing import Optional
 
@@ -80,12 +81,36 @@ async def check_db_health() -> bool:
 
     try:
         # Run sync DB check in thread with timeout
-        result = await asyncio.wait_for(
-            asyncio.to_thread(_check_db_health_sync),
-            timeout=settings.db_health_timeout_seconds,
-        )
-        return result
-    except (asyncio.TimeoutError, Exception):
+        timeout = settings.db_health_timeout_seconds
+        
+        # Try asyncio.to_thread (Python 3.9+) first, fallback to run_in_executor
+        try:
+            # Python 3.9+ has asyncio.to_thread
+            if hasattr(asyncio, 'to_thread'):
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(_check_db_health_sync),
+                    timeout=timeout,
+                )
+            else:
+                # Fallback for Python 3.7-3.8
+                loop = asyncio.get_event_loop()
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                try:
+                    result = await asyncio.wait_for(
+                        loop.run_in_executor(executor, _check_db_health_sync),
+                        timeout=timeout,
+                    )
+                finally:
+                    executor.shutdown(wait=False)
+            return result
+        except (asyncio.TimeoutError, Exception) as e:
+            # Log timeout but don't fail loudly
+            from app.core.logging import logger
+            logger.warning("db_health_check_timeout", extra={"timeout": timeout, "error": str(e)[:100]})
+            return False
+    except Exception as e:
+        from app.core.logging import logger
+        logger.warning("db_health_check_error", extra={"error": str(e)[:100]})
         return False
 
 

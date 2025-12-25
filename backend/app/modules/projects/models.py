@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     Boolean,
     Index,
+    func,
 )
 from sqlalchemy.orm import relationship
 

@@ -94,7 +94,7 @@ export async function updateProject(
   data: UpdateProjectRequest
 ): Promise<Project> {
   return apiRequest<Project>(`/api/v1/projects/${projectId}`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: data,
   });
 }
@@ -106,5 +106,55 @@ export async function getProject(projectId: number): Promise<Project> {
   return apiRequest<Project>(`/api/v1/projects/${projectId}`, {
     method: 'GET',
   });
+}
+
+export interface ProjectFile {
+  id: number;
+  sha256: string;
+  size_bytes: number;
+  mime_type: string;
+  original_filename: string;
+  created_at: string;
+}
+
+export interface ProjectFileListResponse {
+  items: ProjectFile[];
+  total: number;
+}
+
+export interface UploadProjectFileResponse {
+  file_id: number;
+  sha256: string;
+  size_bytes: number;
+  mime_type: string;
+  created_at: string;
+}
+
+/**
+ * List files for a project
+ */
+export async function listProjectFiles(projectId: number): Promise<ProjectFileListResponse> {
+  return apiRequest<ProjectFileListResponse>(`/api/v1/projects/${projectId}/files`, {
+    method: 'GET',
+  });
+}
+
+/**
+ * Upload file to a project
+ */
+export async function uploadProjectFile(
+  projectId: number,
+  file: File
+): Promise<UploadProjectFileResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return apiRequest<UploadProjectFileResponse>(
+    `/api/v1/projects/${projectId}/files`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
 }
 

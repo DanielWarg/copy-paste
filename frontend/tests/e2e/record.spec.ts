@@ -32,16 +32,16 @@ test.describe('Record Module E2E', () => {
     await page.waitForSelector('body', { timeout: 10000 });
   });
 
-  test('Recorder page loads and shows file input', async ({ page }) => {
-    // Navigate to Recorder page (should be default, but ensure)
-    const recorderButton = page.locator('button:has-text("Inspelning")').first();
-    if (await recorderButton.isVisible()) {
-      await recorderButton.click();
+  test('Transkribering page loads and shows file input', async ({ page }) => {
+    // Navigate to Transkribering page
+    const transkriberingButton = page.locator('button:has-text("Transkribering")').first();
+    if (await transkriberingButton.isVisible()) {
+      await transkriberingButton.click();
       await page.waitForTimeout(500);
     }
 
     // Verify page title
-    await expect(page.locator('h2:has-text("Inspelning & Transkribering")')).toBeVisible();
+    await expect(page.locator('h2:has-text("Transkribering")')).toBeVisible();
 
     // Verify file input label
     await expect(page.locator('label:has-text("+ Välj ljudfil")')).toBeVisible();
@@ -51,10 +51,10 @@ test.describe('Record Module E2E', () => {
   });
 
   test('Upload attempt without cert shows mTLS error state (mtls-required)', async ({ page }) => {
-    // Navigate to Recorder page
-    const recorderButton = page.locator('button:has-text("Inspelning")').first();
-    if (await recorderButton.isVisible()) {
-      await recorderButton.click();
+    // Navigate to Transkribering page
+    const transkriberingButton = page.locator('button:has-text("Transkribering")').first();
+    if (await transkriberingButton.isVisible()) {
+      await transkriberingButton.click();
       await page.waitForTimeout(500);
     }
 
@@ -129,10 +129,10 @@ test.describe('Record Module E2E', () => {
     await newPage.goto(FRONTEND_URL);
     await newPage.waitForSelector('body', { timeout: 10000 });
 
-    // Navigate to Recorder page
-    const recorderButton = newPage.locator('button:has-text("Inspelning")').first();
-    if (await recorderButton.isVisible()) {
-      await recorderButton.click();
+    // Navigate to Transkribering page
+    const transkriberingButton = newPage.locator('button:has-text("Transkribering")').first();
+    if (await transkriberingButton.isVisible()) {
+      await transkriberingButton.click();
       await newPage.waitForTimeout(500);
     }
 

@@ -81,7 +81,7 @@ export const Layout: React.FC<LayoutProps> = ({
             <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest mb-3 px-3">
               Bibliotek & Data
             </div>
-            {MODULES.slice(3, 6).map(m => (
+            {MODULES.slice(3).map(m => (
               <NavItem 
                 key={m.id} 
                 module={m} 
@@ -89,14 +89,6 @@ export const Layout: React.FC<LayoutProps> = ({
                 onClick={() => navigate(m.id)} 
               />
             ))}
-          </div>
-
-          <div className="space-y-1 mt-8">
-            <NavItem 
-              module={MODULES[6]} 
-              active={currentPage === 'settings'} 
-              onClick={() => navigate('settings')} 
-            />
           </div>
         </div>
 
